@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole, handleApiError } from "@/lib/auth/guards";
 import { db, ensureTablesCreated } from "@/db";
-import { users, userRoles, auditLogs, UserRoleType } from "@/db/schema";
+import { users, userRoles, auditLogs, questionPackages, UserRoleType } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -106,12 +106,50 @@ export async function DELETE(
 
     if (targetUserId === adminUser.id) {
       return NextResponse.json(
-        { success: false, error: "Tidak dapat menonaktifkan akun sendiri" },
+        { success: false, error: "Tidak dapat menonaktifkan atau menghapus akun sendiri" },
         { status: 400 }
       );
     }
 
-    // Deactivate user (soft delete for integrity)
+    const existingUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, targetUserId))
+      .limit(1);
+
+    if (existingUser.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "Pengguna tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const isHardDelete = searchParams.get("hard") === "true";
+
+    if (isHardDelete) {
+      // Hard delete dengan pemutusan relasi audit log & penugasan paket agar data konsisten
+      await db.update(auditLogs).set({ userId: null }).where(eq(auditLogs.userId, targetUserId));
+      await db.update(questionPackages).set({ assignedValidatorId: null }).where(eq(questionPackages.assignedValidatorId, targetUserId));
+      await db.delete(userRoles).where(eq(userRoles.userId, targetUserId));
+      await db.delete(users).where(eq(users.id, targetUserId));
+
+      await db.insert(auditLogs).values({
+        id: `audit-${crypto.randomUUID()}`,
+        userId: adminUser.id,
+        userEmail: adminUser.email,
+        action: "USER_DELETE",
+        targetResource: `users:${targetUserId}`,
+        details: { deletedUserId: targetUserId, targetEmail: existingUser[0]?.email },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: "Pengguna berhasil dihapus secara permanen",
+      });
+    }
+
+    // Soft delete (deaktivasi akun)
     await db
       .update(users)
       .set({ isActive: false, updatedAt: new Date() })

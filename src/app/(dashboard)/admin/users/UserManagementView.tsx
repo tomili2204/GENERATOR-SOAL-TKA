@@ -18,6 +18,7 @@ import {
   Shield,
   Check,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 
 export interface UserItem {
@@ -257,6 +258,25 @@ export function UserManagementView({ initialUsers }: UserManagementViewProps) {
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // Delete user permanently
+  const handleDeleteUser = async (u: UserItem) => {
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus akun pengguna "${u.name}" (${u.email})?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}?hard=true`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Gagal menghapus pengguna");
+      }
+      setUserList((prev) => prev.filter((item) => item.id !== u.id));
+    } catch (e: any) {
+      alert(e.message || "Gagal menghapus pengguna");
     }
   };
 
@@ -579,13 +599,25 @@ export function UserManagementView({ initialUsers }: UserManagementViewProps) {
 
                       {/* Aksi */}
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => openEditModal(u)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition-colors"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                          <span>Edit</span>
-                        </button>
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() => openEditModal(u)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition-colors cursor-pointer"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                          {u.roles && !u.roles.includes("admin") && (
+                            <button
+                              onClick={() => handleDeleteUser(u)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors cursor-pointer"
+                              title="Hapus Pengguna"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Hapus</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

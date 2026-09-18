@@ -48,9 +48,9 @@ export function AssignValidatorModal({
       const res = await fetch("/api/admin/users");
       const json = await res.json();
       if (json.success) {
-        // Filter user yang memiliki peran validator_soal
+        // Filter user aktif yang memiliki peran validator_soal
         const valUsers = json.data.filter(
-          (u: any) => u.roles && u.roles.includes("validator_soal")
+          (u: any) => u.isActive !== false && u.roles && u.roles.includes("validator_soal")
         );
         setValidators(valUsers);
       }
