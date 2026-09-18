@@ -40,11 +40,8 @@ export function getDb() {
       globalForDb.pgPool = new Pool({
         connectionString: databaseUrl,
         ssl: { rejectUnauthorized: false },
-        max: 10,
+        max: 5,
         connectionTimeoutMillis: 10000,
-      });
-      globalForDb.pgPool.on("connect", (client) => {
-        client.query("SET search_path TO soal, public;");
       });
     }
     globalForDb.dbInstance = drizzlePg(globalForDb.pgPool, { schema });
@@ -69,6 +66,11 @@ export async function ensureTablesCreated() {
   if (globalForDb.tablesInitialized) return;
   globalForDb.tablesInitialized = true;
 
+  const databaseUrl = process.env.DATABASE_URL;
+  if (databaseUrl && databaseUrl.trim() !== "") {
+    return;
+  }
+
   const incrementalSql = `
     ALTER TABLE questions ADD COLUMN IF NOT EXISTS tema_konteks TEXT;
     ALTER TABLE generation_logs ADD COLUMN IF NOT EXISTS tema_konteks TEXT;
@@ -88,7 +90,6 @@ export async function ensureTablesCreated() {
   `;
 
   const dataDir = path.join(process.cwd(), ".data", "soal_ayotka_pg");
-  const databaseUrl = process.env.DATABASE_URL;
 
   // Jika direktori basis data sudah berisi data postgresql, jalankan hanya incremental migration
   if (fs.existsSync(path.join(dataDir, "base"))) {

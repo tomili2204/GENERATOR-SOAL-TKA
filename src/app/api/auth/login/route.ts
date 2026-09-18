@@ -86,8 +86,10 @@ export async function POST(req: NextRequest) {
     return res;
   } catch (error) {
     console.error("Login route error:", error);
+    const cause = (error as any)?.cause;
+    const errorDetail = cause?.message || (typeof cause === "string" ? cause : "") || (error as any)?.message || "Terjadi kesalahan internal saat memproses autentikasi.";
     return NextResponse.json(
-      { success: false, error: "Terjadi kesalahan internal saat memproses autentikasi." },
+      { success: false, error: `Kesalahan autentikasi: ${errorDetail}`, debug: { cause: cause?.message || cause, stack: (error as any)?.stack?.split("\n").slice(0, 3) } },
       { status: 500 }
     );
   }

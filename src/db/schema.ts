@@ -1,4 +1,6 @@
-import { pgTable, text, timestamp, boolean, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgSchema, text, timestamp, boolean, integer, jsonb } from "drizzle-orm/pg-core";
+
+export const soalSchema = pgSchema("soal");
 
 export type UserRoleType = "admin" | "pembuat_soal" | "validator_soal";
 export type QuestionStatusType = "draft" | "menunggu_validasi" | "direvisi" | "perlu_revisi" | "disetujui" | "ditolak";
@@ -38,7 +40,7 @@ export type Question = typeof questions.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
 
 // Tabel Pengguna Internal AyoTKA
-export const users = pgTable("users", {
+export const users = soalSchema.table("users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
@@ -52,7 +54,7 @@ export const users = pgTable("users", {
 });
 
 // Tabel Peran Pengguna (Satu akun dapat memiliki banyak peran)
-export const userRoles = pgTable("user_roles", {
+export const userRoles = soalSchema.table("user_roles", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   role: text("role").$type<UserRoleType>().notNull(),
@@ -60,7 +62,7 @@ export const userRoles = pgTable("user_roles", {
 });
 
 // Tabel Stimulus Soal (Relasi satu-ke-banyak ke Soal grup)
-export const stimulus = pgTable("stimulus", {
+export const stimulus = soalSchema.table("stimulus", {
   id: text("id").primaryKey(),
   jenjang: text("jenjang").$type<JenjangType>().notNull(),
   mapel: text("mapel").notNull(),
@@ -74,7 +76,7 @@ export const stimulus = pgTable("stimulus", {
 });
 
 // Tabel Paket Soal (Kumpulan soal terstruktur 30 slot blueprint)
-export const questionPackages = pgTable("question_packages", {
+export const questionPackages = soalSchema.table("question_packages", {
   id: text("id").primaryKey(),
   code: text("code").notNull().unique(), // Contoh: H01-SD-MAT atau A01-SD-MAT
   nama: text("nama").notNull(),
@@ -95,7 +97,7 @@ export const questionPackages = pgTable("question_packages", {
 });
 
 // Tabel Konfigurasi Generator Otomatis (Per Jenjang + Mapel - Khusus Admin)
-export const generatorConfigs = pgTable("generator_configs", {
+export const generatorConfigs = soalSchema.table("generator_configs", {
   id: text("id").primaryKey(),
   jenjang: text("jenjang").$type<JenjangType>().notNull(),
   mapel: text("mapel").notNull(),
@@ -107,7 +109,7 @@ export const generatorConfigs = pgTable("generator_configs", {
 });
 
 // Tabel Nilai Tetap / Taksonomi (Mapel, Elemen Kompetensi, dsb. - Khusus Admin)
-export const fixedTaxonomies = pgTable("fixed_taxonomies", {
+export const fixedTaxonomies = soalSchema.table("fixed_taxonomies", {
   id: text("id").primaryKey(),
   jenjang: text("jenjang").$type<JenjangType>().notNull(),
   mapel: text("mapel").notNull(),
@@ -121,7 +123,7 @@ export const fixedTaxonomies = pgTable("fixed_taxonomies", {
 });
 
 // Tabel Soal (Fondasi Data dengan kolom spesifik & JSONB payload)
-export const questions = pgTable("questions", {
+export const questions = soalSchema.table("questions", {
   id: text("id").primaryKey(),
   code: text("code").notNull().unique(), // Contoh: TKA-SD-MAT-001 atau H01-SD-MAT-01
   nomorUrut: integer("nomor_urut"), // Slot 1 sampai 30 dalam paket
@@ -149,7 +151,7 @@ export const questions = pgTable("questions", {
 });
 
 // Tabel Pool Tema Konteks (Variasi Latar & Konteks Cerita Soal AI)
-export const temaKonteksPool = pgTable("tema_konteks_pool", {
+export const temaKonteksPool = soalSchema.table("tema_konteks_pool", {
   id: text("id").primaryKey(),
   namaTema: text("nama_tema").notNull(),
   subKonteks: jsonb("sub_konteks").$type<string[]>().default([]).notNull(),
@@ -162,7 +164,7 @@ export const temaKonteksPool = pgTable("tema_konteks_pool", {
 export type TemaKonteksPoolItem = typeof temaKonteksPool.$inferSelect;
 
 // Tabel Audit Log (Khusus Admin memantau aktivitas sistem & tim)
-export const auditLogs = pgTable("audit_logs", {
+export const auditLogs = soalSchema.table("audit_logs", {
   id: text("id").primaryKey(),
   userId: text("user_id").references(() => users.id),
   userEmail: text("user_email").notNull(),
@@ -174,7 +176,7 @@ export const auditLogs = pgTable("audit_logs", {
 });
 
 // Tabel Log Validasi Append-Only (Pencatatan Permanen Setiap Aksi Telaah Validator)
-export const validationLogs = pgTable("validation_logs", {
+export const validationLogs = soalSchema.table("validation_logs", {
   id: text("id").primaryKey(),
   questionId: text("question_id").notNull().references(() => questions.id, { onDelete: "cascade" }),
   questionCode: text("question_code").notNull(),
@@ -190,7 +192,7 @@ export const validationLogs = pgTable("validation_logs", {
 export type ValidationLog = typeof validationLogs.$inferSelect;
 
 // Tabel Log Proses Generate AI Harian
-export const generationLogs = pgTable("generation_logs", {
+export const generationLogs = soalSchema.table("generation_logs", {
   id: text("id").primaryKey(),
   configId: text("config_id").references(() => generatorConfigs.id),
   jenjang: text("jenjang").notNull(),
@@ -215,7 +217,7 @@ export const generationLogs = pgTable("generation_logs", {
 export type GenerationLog = typeof generationLogs.$inferSelect;
 
 // Tabel Pengaturan Global Sistem (Misal: Konfigurasi AI API, Parameter Global)
-export const systemSettings = pgTable("system_settings", {
+export const systemSettings = soalSchema.table("system_settings", {
   key: text("key").primaryKey(),
   value: jsonb("value").default({}).notNull(),
   updatedBy: text("updated_by").references(() => users.id),
@@ -225,7 +227,7 @@ export const systemSettings = pgTable("system_settings", {
 export type SystemSetting = typeof systemSettings.$inferSelect;
 
 // Tabel Pencatatan Pembayaran Honorarium (HR) Validasi & Penulisan Soal
-export const honorariumRecords = pgTable("honorarium_records", {
+export const honorariumRecords = soalSchema.table("honorarium_records", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   jenisTugas: text("jenis_tugas").notNull(), // 'validasi_soal' | 'penulisan_soal'
