@@ -39,6 +39,12 @@ export function getDb() {
     if (!globalForDb.pgPool) {
       globalForDb.pgPool = new Pool({
         connectionString: databaseUrl,
+        ssl: { rejectUnauthorized: false },
+        max: 10,
+        connectionTimeoutMillis: 10000,
+      });
+      globalForDb.pgPool.on("connect", (client) => {
+        client.query("SET search_path TO soal, public;");
       });
     }
     globalForDb.dbInstance = drizzlePg(globalForDb.pgPool, { schema });
@@ -89,8 +95,17 @@ export async function ensureTablesCreated() {
     try {
       if (databaseUrl && databaseUrl.trim() !== "") {
         if (!globalForDb.pgPool) {
-          globalForDb.pgPool = new Pool({ connectionString: databaseUrl });
+          globalForDb.pgPool = new Pool({
+            connectionString: databaseUrl,
+            ssl: { rejectUnauthorized: false },
+            max: 10,
+            connectionTimeoutMillis: 10000,
+          });
+          globalForDb.pgPool.on("connect", (client) => {
+            client.query("SET search_path TO soal, public;");
+          });
         }
+        await globalForDb.pgPool.query("CREATE SCHEMA IF NOT EXISTS soal; SET search_path TO soal, public;");
         await globalForDb.pgPool.query(incrementalSql);
       } else {
         const client = getPgliteInstance();
@@ -304,8 +319,17 @@ export async function ensureTablesCreated() {
 
   if (databaseUrl && databaseUrl.trim() !== "") {
     if (!globalForDb.pgPool) {
-      globalForDb.pgPool = new Pool({ connectionString: databaseUrl });
+      globalForDb.pgPool = new Pool({
+        connectionString: databaseUrl,
+        ssl: { rejectUnauthorized: false },
+        max: 10,
+        connectionTimeoutMillis: 10000,
+      });
+      globalForDb.pgPool.on("connect", (client) => {
+        client.query("SET search_path TO soal, public;");
+      });
     }
+    await globalForDb.pgPool.query("CREATE SCHEMA IF NOT EXISTS soal; SET search_path TO soal, public;");
     await globalForDb.pgPool.query(createTablesSql);
   } else {
     const client = getPgliteInstance();
