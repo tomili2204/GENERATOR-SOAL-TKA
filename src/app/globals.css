@@ -1,0 +1,45 @@
+@import "katex/dist/katex.min.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 248 250 252;
+    --foreground: 15 23 42;
+  }
+
+  body {
+    background-color: #f8fafc;
+    color: #0f172a;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Seragamkan font teks di dalam formula KaTeX dengan font utama aplikasi (Poppins / sans-serif) */
+.katex .text,
+.katex .text *,
+.katex .mathrm,
+.katex .textsf,
+.katex .textbf,
+.katex .textit {
+  font-family: var(--font-poppins), Inter, system-ui, -apple-system, sans-serif !important;
+}
+
+/* Utilitarian compact scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
