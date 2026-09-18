@@ -22,6 +22,7 @@
 
 # AyoTKA local embedded database & scratch
 /.data/
+/.data_backup/
 /scratch/
 *.log
 npm-debug.log*
