@@ -45,37 +45,39 @@ async function handleCron(req: NextRequest) {
       });
     }
 
-    const results = [];
-    for (const cfg of activeConfigs) {
-      try {
-        const res = await generateBatchQuestions({
-          jenjang: cfg.jenjang,
-          mapel: cfg.mapel,
-          configId: cfg.id,
-          totalSoal: cfg.dailyTargetQuota || 30,
-          triggeredBy: "schedule",
-        });
-        results.push({
-          configId: cfg.id,
-          jenjang: cfg.jenjang,
-          mapel: cfg.mapel,
-          status: res.status,
-          packageCode: res.packageCode,
-          totalLolos: res.totalLolos,
-          totalGagal: res.totalGagal,
-          error: res.errorMessage,
-        });
-      } catch (itemErr: any) {
-        console.error(`Gagal generate cron untuk ${cfg.jenjang} - ${cfg.mapel}:`, itemErr);
-        results.push({
-          configId: cfg.id,
-          jenjang: cfg.jenjang,
-          mapel: cfg.mapel,
-          status: "gagal",
-          error: itemErr?.message || "Internal generation error",
-        });
-      }
-    }
+    // Eksekusi paralel agar seluruh jenjang & mapel yang aktif selesai serentak dan cepat
+    const results = await Promise.all(
+      activeConfigs.map(async (cfg: any) => {
+        try {
+          const res = await generateBatchQuestions({
+            jenjang: cfg.jenjang,
+            mapel: cfg.mapel,
+            configId: cfg.id,
+            totalSoal: cfg.dailyTargetQuota || 30,
+            triggeredBy: "schedule",
+          });
+          return {
+            configId: cfg.id,
+            jenjang: cfg.jenjang,
+            mapel: cfg.mapel,
+            status: res.status,
+            packageCode: res.packageCode,
+            totalLolos: res.totalLolos,
+            totalGagal: res.totalGagal,
+            error: res.errorMessage,
+          };
+        } catch (itemErr: any) {
+          console.error(`Gagal generate cron untuk ${cfg.jenjang} - ${cfg.mapel}:`, itemErr);
+          return {
+            configId: cfg.id,
+            jenjang: cfg.jenjang,
+            mapel: cfg.mapel,
+            status: "gagal",
+            error: itemErr?.message || "Internal generation error",
+          };
+        }
+      })
+    );
 
     return NextResponse.json({
       success: true,
