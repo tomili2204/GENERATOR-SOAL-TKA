@@ -64,7 +64,7 @@ export function Header({ user }: HeaderProps) {
       <div className="flex items-center gap-4">
         {/* Role Chips */}
         <div className="hidden md:flex items-center gap-1.5">
-          {user.roles.map((r: UserRoleType) => (
+          {Array.from(new Set(user.roles)).map((r: UserRoleType) => (
             <RoleBadge key={r} role={r} />
           ))}
         </div>

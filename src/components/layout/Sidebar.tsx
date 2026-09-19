@@ -11,8 +11,15 @@ interface SidebarProps {
   user: SessionUser;
 }
 
+const ROLE_LABELS: Record<string, { label: string; className: string }> = {
+  admin:          { label: "Administrator",   className: "bg-violet-50 border-violet-200 text-violet-700" },
+  pembuat_soal:   { label: "Pembuat Soal",    className: "bg-blue-50 border-blue-200 text-blue-700" },
+  validator_soal: { label: "Validator Soal",  className: "bg-emerald-50 border-emerald-200 text-emerald-700" },
+};
+
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
+  const uniqueRoles = Array.from(new Set(user.roles));
 
   // Filter menu navigasi berdasarkan peran pengguna yang sedang login
   const permittedItems = DASHBOARD_NAV_ITEMS.filter((item) =>
@@ -37,14 +44,17 @@ export function Sidebar({ user }: SidebarProps) {
             <span>Peran Aktif Akun</span>
           </div>
           <div className="mt-1.5 flex flex-wrap gap-1">
-            {user.roles.map((role) => (
-              <span
-                key={role}
-                className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-white border border-slate-200 text-slate-700"
-              >
-                {role}
-              </span>
-            ))}
+            {uniqueRoles.map((role) => {
+              const config = ROLE_LABELS[role] ?? { label: role, className: "bg-white border-slate-200 text-slate-700" };
+              return (
+                <span
+                  key={role}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${config.className}`}
+                >
+                  {config.label}
+                </span>
+              );
+            })}
           </div>
         </div>
 
