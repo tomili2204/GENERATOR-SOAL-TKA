@@ -16,6 +16,7 @@ import {
   Wallet,
   UserCheck,
   Coins,
+  Rocket,
 } from "lucide-react";
 
 export interface RoleConfig {
@@ -163,11 +164,20 @@ export const PACKAGE_STATUS_CONFIGS: Record<PaketSoalStatusType, PackageStatusCo
   siap_rilis: {
     key: "siap_rilis",
     label: "Siap Rilis",
+    bgClass: "bg-indigo-50",
+    textClass: "text-indigo-800",
+    borderClass: "border-indigo-300",
+    dotClass: "bg-indigo-600",
+    badgeText: "Siap Rilis (100% Lolos)",
+  },
+  diterbitkan: {
+    key: "diterbitkan",
+    label: "Diterbitkan",
     bgClass: "bg-emerald-50",
     textClass: "text-emerald-800",
     borderClass: "border-emerald-300",
     dotClass: "bg-emerald-600",
-    badgeText: "Siap Rilis (100% Lolos)",
+    badgeText: "Diterbitkan (Tayang ke Siswa)",
   },
 };
 
@@ -265,6 +275,13 @@ export const DASHBOARD_NAV_ITEMS: NavItem[] = [
     title: "Penugasan Paket Soal",
     href: "/admin/penugasan",
     icon: UserCheck,
+    roles: ["admin"],
+    section: "Administrator",
+  },
+  {
+    title: "Paket Siap Rilis",
+    href: "/admin/siap-rilis",
+    icon: Rocket,
     roles: ["admin"],
     section: "Administrator",
   },

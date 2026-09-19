@@ -11,7 +11,7 @@ export type JenisSoalType = "tunggal" | "grup";
 export type TingkatKesulitanType = "rendah" | "sedang" | "tinggi";
 export type SumberSoalType = "ai_generated" | "manual_upload";
 export type StimulusTipeType = "teks" | "data";
-export type PaketSoalStatusType = "draft" | "dalam_validasi" | "perlu_revisi" | "siap_rilis";
+export type PaketSoalStatusType = "draft" | "dalam_validasi" | "perlu_revisi" | "siap_rilis" | "diterbitkan";
 export type TipeSumberPaketType = "manual" | "ai";
 
 export interface QuestionPayload {

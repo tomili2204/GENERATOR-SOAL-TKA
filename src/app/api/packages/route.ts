@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
           .from(questions)
           .where(eq(questions.paketId, pkg.id));
 
-        const calculation = calculatePackageStatus(pkgQuestions);
+        const calculation = calculatePackageStatus(pkgQuestions, pkg.status);
 
         // Perbarui status paket di DB jika berbeda dari kalkulasi terbaru
         if (pkg.status !== calculation.status) {

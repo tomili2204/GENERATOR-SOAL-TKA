@@ -3,53 +3,58 @@ import { db, ensureTablesCreated } from "@/db";
 import { questionPackages, questions, users, QuestionPackage, Question, User } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { calculatePackageStatus } from "@/lib/validations/package-blueprint";
-import { PackageAssignmentView, type PackageAdminItem } from "./PackageAssignmentView";
-import { UserCheck, ShieldCheck } from "lucide-react";
+import { SiapRilisView, type SiapRilisPackageItem } from "./SiapRilisView";
+import { Rocket, ShieldCheck } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPackageAssignmentPage() {
+export default async function AdminSiapRilisPage() {
   await requireRole("admin");
   await ensureTablesCreated();
 
-  // Ambil seluruh paket soal
+  // Ambil semua paket soal
   const packagesList: QuestionPackage[] = await db
     .select()
     .from(questionPackages)
     .orderBy(desc(questionPackages.createdAt));
 
-  // Ambil daftar user untuk mapping author & validator
+  // Ambil daftar users untuk mapping author & validator
   const allUsers: User[] = await db.select().from(users);
   const userMap = new Map(allUsers.map((u: User) => [u.id, u]));
 
-  // Ambil pertanyaan & kalkulasi progres tiap paket
+  // Ambil seluruh pertanyaan untuk menghitung progres 30 butir
   const allQuestions: Question[] = await db.select().from(questions);
 
-  const enrichedPackages: PackageAdminItem[] = await Promise.all(
-    packagesList.map(async (pkg: QuestionPackage) => {
-      const pkgQuestions = allQuestions.filter((q: Question) => q.paketId === pkg.id);
-      const calculation = calculatePackageStatus(pkgQuestions, pkg.status);
+  const relevantPackages: SiapRilisPackageItem[] = [];
 
-      // Sinkronisasi status ke DB jika ada perubahan (misal: baru saja 30 butir lolos telaah)
-      if (pkg.status !== calculation.status && pkg.status !== "diterbitkan") {
-        await db
-          .update(questionPackages)
-          .set({ status: calculation.status, updatedAt: new Date() })
-          .where(eq(questionPackages.id, pkg.id));
-      }
+  for (const pkg of packagesList) {
+    const pkgQuestions = allQuestions.filter((q: Question) => q.paketId === pkg.id);
+    const calculation = calculatePackageStatus(pkgQuestions, pkg.status);
 
+    // Sinkronisasi status di database jika ada perbedaan (misal baru tuntas 30/30)
+    if (pkg.status !== calculation.status && pkg.status !== "diterbitkan") {
+      await db
+        .update(questionPackages)
+        .set({ status: calculation.status, updatedAt: new Date() })
+        .where(eq(questionPackages.id, pkg.id));
+    }
+
+    // Hanya ambil paket yang siap_rilis, diterbitkan, atau sudah 100% disetujui
+    const isSiap = calculation.status === "siap_rilis" || calculation.percentageApproved === 100;
+    const isDiterbitkan = pkg.status === "diterbitkan" || calculation.status === "diterbitkan";
+
+    if (isSiap || isDiterbitkan) {
       const authorUser = pkg.authorId ? userMap.get(pkg.authorId) : null;
       const validatorUser = pkg.assignedValidatorId ? userMap.get(pkg.assignedValidatorId) : null;
 
-      return {
+      relevantPackages.push({
         id: pkg.id,
         code: pkg.code || pkg.id,
         nama: pkg.nama,
         jenjang: pkg.jenjang,
         mapel: pkg.mapel,
         tipeSumber: pkg.tipeSumber as "manual" | "ai",
-        status: calculation.status,
-        authorId: pkg.authorId,
+        status: isDiterbitkan ? "diterbitkan" : "siap_rilis",
         author: authorUser
           ? {
               id: authorUser.id,
@@ -58,7 +63,6 @@ export default async function AdminPackageAssignmentPage() {
               instansi: authorUser.instansi || undefined,
             }
           : null,
-        assignedValidatorId: pkg.assignedValidatorId,
         assignedValidator: validatorUser
           ? {
               id: validatorUser.id,
@@ -67,12 +71,12 @@ export default async function AdminPackageAssignmentPage() {
               instansi: validatorUser.instansi || undefined,
             }
           : null,
-        assignedAt: pkg.assignedAt ? new Date(pkg.assignedAt).toISOString() : null,
         createdAt: pkg.createdAt ? new Date(pkg.createdAt).toISOString() : new Date().toISOString(),
+        updatedAt: pkg.updatedAt ? new Date(pkg.updatedAt).toISOString() : null,
         progress: calculation,
-      };
-    })
-  );
+      });
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -81,29 +85,31 @@ export default async function AdminPackageAssignmentPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-indigo-600 font-mono text-xs font-semibold uppercase tracking-wider mb-1">
-              <UserCheck className="w-4 h-4" />
-              <span>Manajemen Alur Kerja & Validasi Asesmen</span>
+              <Rocket className="w-4 h-4" />
+              <span>Manajemen Publikasi Asesmen</span>
             </div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              Penugasan Validator Paket Soal
+              Penerbitan & Rilis Paket Soal Siswa
             </h1>
             <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
-              Tugaskan validator profesional untuk memeriksa dan menelaah paket naskah tryout (target 30 slot butir soal).
-              Sistem secara otomatis menerapkan kebijakan <strong>Separation of Duties</strong> untuk mencegah penelaahan mandiri.
+              Daftar paket naskah tryout yang telah <strong>100% tuntas divalidasi</strong> oleh validator penelaah.
+              Klik tombol <strong>Terbitkan</strong> pada paket yang diinginkan agar naskah asesmen resmi tayang dan dapat diakses siswa.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-right">
-              <p className="text-[10px] font-mono text-slate-400 uppercase">Kebijakan Sistem</p>
-              <p className="text-xs font-bold text-indigo-700 font-mono">SoD Enforcement Active</p>
+            <div className="px-3.5 py-2 rounded-xl bg-indigo-50 border border-indigo-100 text-right">
+              <p className="text-[10px] font-mono text-indigo-400 uppercase font-semibold">Siap Ditayangkan</p>
+              <p className="text-lg font-bold text-indigo-700 font-mono">
+                {relevantPackages.filter((p) => p.status === "siap_rilis").length} Paket
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Interactive Table View with Pagination & Modal */}
-      <PackageAssignmentView initialPackages={enrichedPackages} />
+      {/* Interactive Siap Rilis View */}
+      <SiapRilisView initialPackages={relevantPackages} />
     </div>
   );
 }

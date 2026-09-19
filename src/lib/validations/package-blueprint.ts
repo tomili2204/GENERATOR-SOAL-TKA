@@ -103,7 +103,8 @@ export interface PackageStatusCalculation {
 }
 
 export function calculatePackageStatus(
-  questionsList: Array<{ status: string; nomorUrut?: number | null }>
+  questionsList: Array<{ status: string; nomorUrut?: number | null }>,
+  currentStatus?: string
 ): PackageStatusCalculation {
   const totalSoal = 30;
   // Ambil hanya soal yang valid memiliki nomorUrut 1 s.d. 30
@@ -125,7 +126,11 @@ export function calculatePackageStatus(
 
   // Gerbang kelulusan: 100% 30/30 lolos
   if (disetujuiCount === 30) {
-    status = "siap_rilis";
+    if (currentStatus === "diterbitkan") {
+      status = "diterbitkan";
+    } else {
+      status = "siap_rilis";
+    }
   } else if (direvisiCount > 0 || ditolakCount > 0) {
     status = "perlu_revisi";
   } else if (filledSoal === 30 && menungguCount > 0) {
@@ -143,7 +148,7 @@ export function calculatePackageStatus(
     ditolakCount,
     menungguCount,
     percentageApproved,
-    canPublish: disetujuiCount === 30,
+    canPublish: disetujuiCount === 30 && status !== "diterbitkan",
   };
 }
 

@@ -22,6 +22,7 @@ import {
   Layers,
   Sparkles,
   BookOpen,
+  Package,
 } from "lucide-react";
 
 interface UserInfo {
@@ -419,11 +420,12 @@ export function AdminAllSoalTableView({
                         {pkg ? (
                           <Link
                             href={`/pembuat/paket/${q.paketId}`}
-                            className="inline-flex items-center gap-1 font-mono text-indigo-600 hover:text-indigo-800 hover:underline text-[11.5px] font-medium"
-                            title={pkg.nama}
+                            className="inline-flex items-center gap-1 font-mono text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                            title={`Klik untuk Buka & Terbitkan Paket ${pkg.code}`}
                           >
-                            {pkg.code}
-                            <ExternalLink className="w-3 h-3 opacity-60" />
+                            <Package className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>{pkg.code}</span>
+                            <ExternalLink className="w-3 h-3 text-indigo-400" />
                           </Link>
                         ) : (
                           <span className="text-slate-400 font-mono text-[11px]">–</span>

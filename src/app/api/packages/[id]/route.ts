@@ -100,7 +100,7 @@ export async function GET(
     }
 
     // Kalkulasi status terkini
-    const progress = calculatePackageStatus(pkgQuestions);
+    const progress = calculatePackageStatus(pkgQuestions, pkg.status);
 
     // Sinkronisasi status paket jika ada perubahan
     if (pkg.status !== progress.status) {
@@ -185,8 +185,8 @@ export async function PATCH(
 
     const pkg = pkgRecords[0];
 
-    // Jika ingin mempublikasikan paket (siap_rilis)
-    if (body.action === "publish" || body.status === "siap_rilis") {
+    // Jika ingin mempublikasikan paket (diterbitkan)
+    if (body.action === "publish" || body.status === "diterbitkan" || body.status === "siap_rilis") {
       // Validasi kelulusan 100% (30/30 butir disetujui)
       const pkgQuestions = await db
         .select({
@@ -197,7 +197,7 @@ export async function PATCH(
         .from(questions)
         .where(eq(questions.paketId, pkg.id));
 
-      const calc = calculatePackageStatus(pkgQuestions);
+      const calc = calculatePackageStatus(pkgQuestions, pkg.status);
 
       if (calc.disetujuiCount !== 30) {
         return NextResponse.json(
@@ -211,7 +211,7 @@ export async function PATCH(
 
       await db
         .update(questionPackages)
-        .set({ status: "siap_rilis", updatedAt: new Date() })
+        .set({ status: "diterbitkan", updatedAt: new Date() })
         .where(eq(questionPackages.id, pkg.id));
 
       await db.insert(auditLogs).values({
@@ -230,7 +230,7 @@ export async function PATCH(
 
       return NextResponse.json({
         success: true,
-        message: `Paket ${pkg.code} berhasil dipublikasikan dan siap tayang!`,
+        message: `Paket ${pkg.code} berhasil diterbitkan dan resmi tayang ke halaman siswa!`,
       });
     }
 

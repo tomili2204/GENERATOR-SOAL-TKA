@@ -168,29 +168,38 @@ export default function PembuatPaketDetailPage() {
 
           {/* Tombol Terbitkan Paket */}
           <div className="flex flex-col items-end gap-1.5">
-            <button
-              onClick={handlePublish}
-              disabled={!progress?.canPublish || isPublishing || packageData.status === "siap_rilis"}
-              className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm ${
-                packageData.status === "siap_rilis"
-                  ? "bg-emerald-600 text-white cursor-default"
-                  : progress?.canPublish
-                  ? "bg-slate-900 text-white hover:bg-slate-800"
-                  : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
-              }`}
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>
-                {packageData.status === "siap_rilis"
-                  ? "Paket Telah Diterbitkan (Siap Tayang)"
-                  : isPublishing
-                  ? "Memproses..."
-                  : "Terbitkan Paket (Siap Tayang)"}
-              </span>
-            </button>
-            {!progress?.canPublish && packageData.status !== "siap_rilis" && (
+            {packageData.status === "diterbitkan" ? (
+              <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-sm">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Paket Telah Diterbitkan (Tayang ke Siswa)</span>
+              </div>
+            ) : progress?.canPublish ? (
+              <button
+                onClick={handlePublish}
+                disabled={isPublishing}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-md hover:shadow-lg cursor-pointer transform active:scale-95"
+              >
+                <Send className="w-4 h-4" />
+                <span>{isPublishing ? "Memproses..." : "🚀 Terbitkan Paket (Siap Tayang)"}</span>
+              </button>
+            ) : (
+              <button
+                disabled
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Terbitkan Paket (Siap Tayang)</span>
+              </button>
+            )}
+
+            {!progress?.canPublish && packageData.status !== "diterbitkan" && (
               <span className="text-[11px] text-slate-400 font-mono">
-                Wajib 30/30 butir disetujui untuk membuka tombol terbit.
+                Wajib 30/30 butir disetujui untuk membuka tombol terbit ({progress?.disetujuiCount || 0}/30 disetujui).
+              </span>
+            )}
+            {progress?.canPublish && packageData.status !== "diterbitkan" && (
+              <span className="text-[11px] text-indigo-600 font-semibold flex items-center gap-1">
+                <span>★</span> Seluruh 30 butir lolos telaah. Klik tombol di atas untuk merilis paket ke siswa.
               </span>
             )}
           </div>
