@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/ui/Badge";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { LatexPreview } from "@/components/ui/LatexPreview";
 import { SvgIllustration } from "@/components/ui/SvgIllustration";
+import { ValidatorNoteText } from "@/components/ui/ValidatorNoteText";
 import { isJenjangMatch } from "@/lib/jenjang-utils";
 import {
   Search,
@@ -773,10 +774,12 @@ export function AdminAllSoalTableView({
                         </span>
                       </div>
                       <div>
-                        <span className="text-slate-400">Catatan Validasi:</span>{" "}
-                        <span className="text-slate-700 italic">
-                          {selectedQuestion.validationNotes || "–"}
-                        </span>
+                        <span className="text-slate-400">Catatan Validasi:</span>
+                        {selectedQuestion.validationNotes ? (
+                          <ValidatorNoteText text={selectedQuestion.validationNotes} className="text-slate-700 italic mt-1" />
+                        ) : (
+                          <span className="text-slate-700 italic"> –</span>
+                        )}
                       </div>
                       <div>
                         <span className="text-slate-400">Dibuat Pada:</span>{" "}

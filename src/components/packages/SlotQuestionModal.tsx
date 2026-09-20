@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { LatexPreview } from "@/components/ui/LatexPreview";
 import { SvgIllustration } from "@/components/ui/SvgIllustration";
+import { ValidatorNoteText } from "@/components/ui/ValidatorNoteText";
 import { validateLatexDelimiters } from "@/lib/validations/latex";
 import { StimulusSelector } from "@/components/pembuat/StimulusSelector";
 import { SlotData } from "./PackageSlotGrid";
@@ -282,10 +283,10 @@ export function SlotQuestionModal({
         {slot.isFilled && q?.status === "ditolak" && (
           <div className="bg-rose-50 border-b border-rose-200 px-6 py-3 flex items-start gap-2.5 text-xs text-rose-900 shrink-0">
             <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold">Slot ini DITOLAK oleh Validator:</span>{" "}
-              <span>{q.validationNotes || "Tidak memenuhi kriteria kelulusan naskah."}</span>
-              <p className="text-rose-700 mt-0.5 font-medium">
+            <div className="space-y-1.5">
+              <span className="font-bold block">Slot ini DITOLAK oleh Validator:</span>
+              <ValidatorNoteText text={q.validationNotes || "Tidak memenuhi kriteria kelulusan naskah."} />
+              <p className="text-rose-700 font-medium">
                 👉 Silakan perbaiki atau unggah butir soal baru sebagai pengganti slot ini agar paket dapat lolos 30/30.
               </p>
             </div>
@@ -295,9 +296,9 @@ export function SlotQuestionModal({
         {slot.isFilled && (q?.status === "direvisi" || q?.status === "perlu_revisi") && (
           <div className="bg-orange-50 border-b border-orange-200 px-6 py-3 flex items-start gap-2.5 text-xs text-orange-900 shrink-0">
             <AlertTriangle className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold">Catatan Perbaikan Validator:</span>{" "}
-              <span>{q.validationNotes || "Perlu penyesuaian formula atau redaksi."}</span>
+            <div className="space-y-1.5">
+              <span className="font-bold block">Catatan Perbaikan Validator:</span>
+              <ValidatorNoteText text={q.validationNotes || "Perlu penyesuaian formula atau redaksi."} />
             </div>
           </div>
         )}

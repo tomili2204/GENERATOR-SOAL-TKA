@@ -14,6 +14,7 @@ import { validateLatexDelimiters } from "@/lib/validations/latex";
 import { generatePackageCode, calculatePackageStatus } from "@/lib/validations/package-blueprint";
 import { deepRepairLatex, preprocessJsonForLatex } from "@/lib/latex/latex-repair";
 import { validateAndRepairSvg } from "@/lib/validations/svg";
+import { renderDiagramTemplate } from "./diagram-templates";
 import { generateMockGeminiBatchResponse as mockDataBatchResponse } from "./mock-data";
 import { selectThemeForGeneration } from "./theme-selector";
 import { normalizeJenjang } from "@/lib/jenjang-utils";
@@ -93,12 +94,16 @@ PRINSIP KUALITAS SOAL (MUTLAK WAJIB DIPATUHI):
    Dilarang keras membuat soal satu langkah sederhana (seperti sekadar menghitung x = a * b, atau konversi satuan langsung tanpa pemodelan). Setiap butir soal WAJIB menuntut minimal 2-3 langkah berpikir matematis/inferensial (misalnya: konversi satuan -> operasi campuran berbobot -> interpretasi sisa/kembalian; atau mencari harga satuan diskon -> menghitung kebutuhan uang; atau menghitung luas bangun total dikurangi bagian yang tidak diarsir).
 2. SINKRONISASI MUTLAK STIMULUS DENGAN BUTIR SOAL GRUP:
    Untuk seluruh butir soal grup (jenis_soal: "grup"), soal WAJIB mengacu langsung pada entitas, tabel data, angka, atau alur cerita dalam stimulus yang dipasangkan. Dilarang keras membuat soal grup yang berdiri sendiri atau tidak berhubungan dengan teks/tabel stimulus!
-3. DUKUNGAN REPRESENTASI VISUAL & TABEL DATA (DIAGRAM SVG MANDIRI):
-   - Pada butir soal yang melibatkan geometri bangun datar/ruang, denah, sudut, irisan/gabungan bidang, atau diagram proporsional: WAJIB LANGSUNG DIGAMBARKAN KODE SVG SECARA LENGKAP & MANDIRI pada field "gambar" dengan format: {"tipe": "svg", "svg_content": "<svg viewBox=\"0 0 480 300\" width=\"100%\" xmlns=\"http://www.w3.org/2000/svg\" ...>...</svg>", "deskripsi_alt": "..."}.
-   - DILARANG KERAS menggunakan status placeholder "perlu_ilustrasi". Seluruh ilustrasi visual yang dibutuhkan wajib langsung digambar menggunakan elemen SVG yang valid (<rect>, <circle>, <polygon>, <path>, <line>, <text>, dll.) dengan dimensi ukuran angka yang proporsional, rapi, dan jelas terbaca.
+3. DUKUNGAN REPRESENTASI VISUAL & TABEL DATA (DIAGRAM TEMPLATE & SVG MANDIRI):
+   - UNTUK EMPAT KATEGORI VISUAL BERIKUT, WAJIB GUNAKAN FORMAT TEMPLATE DIAGRAM (bukan svg_content tulisan bebas), karena perhitungan geometri presisinya (proporsi batang, sudut juring, lebar arsiran, skala garis bilangan) dilakukan otomatis oleh sistem berdasarkan angka yang Anda isi — bukan Anda hitung sendiri koordinat pikselnya:
+     a. Diagram batang data kategori: {"tipe": "diagram", "archetype": "diagram_batang", "data": {"judul": string?, "satuan_y": string?, "kategori": string[], "nilai": number[]}, "deskripsi_alt": "..."}
+     b. Diagram lingkaran/proporsi: {"tipe": "diagram", "archetype": "diagram_lingkaran", "data": {"judul": string?, "segmen": [{"label": string, "nilai": number}, ...]}, "deskripsi_alt": "..."}
+     c. Model visual arsiran pecahan: {"tipe": "diagram", "archetype": "model_pecahan", "data": {"bentuk": "lingkaran"|"persegi_panjang", "penyebut": number (1-12), "pembilang": number (0..penyebut), "label": string?}, "deskripsi_alt": "..."}
+     d. Garis bilangan: {"tipe": "diagram", "archetype": "garis_bilangan", "data": {"min": number, "max": number, "step": number?, "tanda": [{"nilai": number, "label": string?}, ...]?}, "deskripsi_alt": "..."}
+   - UNTUK SELAIN EMPAT KATEGORI DI ATAS (geometri bangun datar/ruang, denah, sudut, irisan/gabungan bidang, jaring-jaring, dan diagram proporsional lain yang tidak masuk kategori a-d): WAJIB LANGSUNG DIGAMBARKAN KODE SVG SECARA LENGKAP & MANDIRI pada field "gambar" dengan format: {"tipe": "svg", "svg_content": "<svg viewBox=\"0 0 480 300\" width=\"100%\" xmlns=\"http://www.w3.org/2000/svg\" ...>...</svg>", "deskripsi_alt": "..."}.
+   - DILARANG KERAS menggunakan status placeholder "perlu_ilustrasi". Seluruh ilustrasi visual yang dibutuhkan wajib langsung digambarkan lewat salah satu dari kedua format di atas dengan dimensi ukuran angka yang proporsional, rapi, dan jelas terbaca.
    - Jika butir soal memang murni berbasis narasi/perhitungan aljabar tanpa perlu visual, isi field "gambar" dengan null.
-   - KUALITAS TEKNIS SVG WAJIB DIJAGA KETAT: seluruh koordinat elemen (x, y, cx, cy, titik path/polygon) WAJIB berada di dalam batas viewBox, DILARANG ada bagian gambar atau teks yang terpotong/keluar kanvas. Label teks antar-elemen DILARANG saling tumpang tindih atau bertabrakan dengan garis/bentuk lain — beri jarak yang cukup. Setiap tag pembuka elemen berpasangan (<g>, <text>, <tspan>) WAJIB memiliki tag penutup yang sesuai, jangan pernah membiarkan svg_content terpotong sebelum tag "</svg>" penutup.
-   - Untuk label angka/teks yang diposisikan di tengah suatu bentuk atau sumbu, WAJIB gunakan atribut text-anchor="middle" (dan dominant-baseline="middle" bila perlu) agar teks benar-benar center dan tidak melenceng dari objek yang dijelaskan.
+   - KUALITAS TEKNIS svg_content BEBAS (di luar 4 archetype template) WAJIB DIJAGA KETAT: seluruh koordinat elemen (x, y, cx, cy, titik path/polygon) WAJIB berada di dalam batas viewBox, DILARANG ada bagian gambar atau teks yang terpotong/keluar kanvas. Label teks antar-elemen DILARANG saling tumpang tindih atau bertabrakan dengan garis/bentuk lain — beri jarak yang cukup. Setiap tag pembuka elemen berpasangan (<g>, <text>, <tspan>) WAJIB memiliki tag penutup yang sesuai, jangan pernah membiarkan svg_content terpotong sebelum tag "</svg>" penutup. Untuk label angka/teks yang diposisikan di tengah suatu bentuk atau sumbu, WAJIB gunakan atribut text-anchor="middle" (dan dominant-baseline="middle" bila perlu).
 4. KONTEKS REALISTIS OTENTIK INDONESIA & ANTI-MONOTONI (LARANGAN KLISÉ):
    - Gunakan konteks nyata Nusantara yang kaya dan bervariasi: kegiatan bazar/UMKM, resep kue tradisional proporsional, kalender jadwal latihan bersama dengan tanggal awal berbeda, denah rumah berskala, ketebalan dinding kayu wadah, pembagian bantuan posko bencana, sistem tarif parkir/transportasi bertingkat, penjualan kerajinan daerah, data energi panel surya sekolah, tiket penyeberangan kapal ferry, panen hidroponik, dll.
    - DILARANG KERAS menggunakan nama klise yang monoton dan berulang seperti 'Maju Bersama', 'Maju Jaya', 'Makmur Bersama', atau tokoh yang selalu bernama 'Budi' dan 'Siti'!
@@ -121,7 +126,7 @@ Setiap elemen array adalah satu objek soal dengan field persis berikut:
   "stimulus_id_sementara": string|null,
   "tema_konteks": string,
   "soal_text": string,
-  "gambar": null | {"tipe": "svg", "svg_content": string, "deskripsi_alt": string},
+  "gambar": null | {"tipe": "svg", "svg_content": string, "deskripsi_alt": string} | {"tipe": "diagram", "archetype": "diagram_batang"|"diagram_lingkaran"|"model_pecahan"|"garis_bilangan", "data": object, "deskripsi_alt": string},
   "opsi": [{"label": string, "text": string}] | null,
   "pernyataan": [{"no": number, "text": string}] | null,
   "kategori_respons": [string] | null,
@@ -474,15 +479,15 @@ MINIMAL 6 SAMPAI 10 BUTIR SOAL DALAM PAKET INI WAJIB MEMILIKI FIELD "gambar" YAN
 
 ATURAN SPESIFIK VISUALISASI PER TOPIK:
 ${isMat ? `1. DATA DAN PELUANG:
-   - WAJIB menyajikan stimulus data dalam bentuk DIAGRAM BATANG SVG, DIAGRAM GARIS SVG, atau DIAGRAM LINGKARAN SVG dengan sumbu (X/Y), skala angka, legenda warna, dan judul yang rapi (DILARANG hanya tabel teks biasa).
+   - WAJIB menyajikan stimulus data memakai FORMAT TEMPLATE {"tipe": "diagram", "archetype": "diagram_batang", ...} atau {"tipe": "diagram", "archetype": "diagram_lingkaran", ...} sesuai skema yang sudah dijelaskan di atas (DILARANG hanya tabel teks biasa, dan DILARANG menghitung sendiri koordinat batang/juringnya lewat svg_content bebas).
 2. GEOMETRI DAN PENGUKURAN:
-   - WAJIB menyertakan DIAGRAM BIDANG / BANGUN RUANG / DENAH SVG (misalnya denah taman, irisan bangun, segitiga siku-siku Pythagoras, jaring-jaring bangun, bangun gabungan) lengkap dengan label dimensi (panjang, lebar, jari-jari, sudut) yang proporsional dan jelas.
+   - WAJIB menyertakan DIAGRAM BIDANG / BANGUN RUANG / DENAH SVG bebas (misalnya denah taman, irisan bangun, segitiga siku-siku Pythagoras, jaring-jaring bangun, bangun gabungan) lengkap dengan label dimensi (panjang, lebar, jari-jari, sudut) yang proporsional dan jelas.
 3. BILANGAN DAN PECAHAN:
-   ${isSd ? `- Pada soal pecahan, WAJIB menyertakan MODEL VISUAL ARSIRAN PECAHAN SVG (lingkaran kue/pizza terbagi rata berarsir atau deretan persegi panjang berarsir) agar siswa SD dapat mengamati konsep pecahan secara visual konkret.
-   - Pada operasi hitung atau urutan bilangan bertanda, sertakan visual GARIS BILANGAN BERTANDA SVG dengan titik-titik nilai.` : `- Pada perbandingan, rasio, atau operasi bertanda, sertakan visual GARIS BILANGAN SVG atau MODEL DIAGRAM BATANG RASIO SVG.`}` : `1. WACANA INFORMASI & DATA:
-   - Pada butir soal berbasis wacana informasi/fakta, sertakan KARTU INFOGRAFIK RINGKAS SVG (kotak kartu dengan ikon SVG sederhana, sorotan angka fakta/persentase, atau bagan visual).
+   ${isSd ? `- Pada soal pecahan, WAJIB menyertakan FORMAT TEMPLATE {"tipe": "diagram", "archetype": "model_pecahan", ...} (bentuk lingkaran kue/pizza atau persegi panjang berarsir) agar siswa SD dapat mengamati konsep pecahan secara visual konkret dan proporsi arsirannya presisi.
+   - Pada operasi hitung atau urutan bilangan bertanda, sertakan FORMAT TEMPLATE {"tipe": "diagram", "archetype": "garis_bilangan", ...} dengan titik-titik nilai.` : `- Pada perbandingan, rasio, atau operasi bertanda, sertakan FORMAT TEMPLATE {"tipe": "diagram", "archetype": "garis_bilangan", ...} atau {"tipe": "diagram", "archetype": "diagram_batang", ...} untuk rasio.`}` : `1. WACANA INFORMASI & DATA:
+   - Pada butir soal berbasis wacana informasi/fakta yang memuat proporsi/persentase, gunakan FORMAT TEMPLATE {"tipe": "diagram", "archetype": "diagram_lingkaran", ...}; untuk kartu infografik ringkas lain gunakan svg_content bebas (kotak kartu dengan ikon SVG sederhana, sorotan angka fakta).
 2. TEKS PETUNJUK / PROSEDUR:
-   - Sertakan DIAGRAM ALUR / BAGAN LANGKAH KERJA SVG yang menarik dan mudah dipahami siswa.`}
+   - Sertakan DIAGRAM ALUR / BAGAN LANGKAH KERJA SVG bebas yang menarik dan mudah dipahami siswa.`}
 
 STANDAR TEKNIS KUALITAS SVG:
 - Gunakan viewBox="0 0 480 260" dengan lebar responsive width="100%".
@@ -1050,7 +1055,17 @@ ${formatArchetypeGuidancePrompt(deterministicSlotPlans.slice(chunk1Count), jenja
       }
     }
 
-    // D3. Pengecekan & Perbaikan Otomatis Kualitas SVG (anti-tag berbahaya & anti-output terpotong)
+    // D3. Render Deterministik Template Diagram (diagram_batang/lingkaran/model_pecahan/garis_bilangan)
+    if (q.gambar && q.gambar.tipe === "diagram") {
+      const diagramResult = renderDiagramTemplate({ archetype: q.gambar.archetype, ...(q.gambar.data || {}) });
+      if (!diagramResult.svg) {
+        reasons.push(`Spesifikasi template diagram tidak valid: ${diagramResult.error}`);
+      } else {
+        q.gambar = { tipe: "svg", svg_content: diagramResult.svg, deskripsi_alt: q.gambar.deskripsi_alt || "" };
+      }
+    }
+
+    // D4. Pengecekan & Perbaikan Otomatis Kualitas SVG (anti-tag berbahaya & anti-output terpotong)
     if (q.gambar && q.gambar.tipe === "svg") {
       const svgResult = validateAndRepairSvg(q.gambar.svg_content);
       if (!svgResult.content) {
@@ -1252,6 +1267,15 @@ ${curriculumGuidance}`;
       if (q.jenis_soal === "grup") {
         if (!q.stimulus_id_sementara || rejectedStimuli[q.stimulus_id_sementara]) {
           qReasons.push("Stimulus yang terkait ditolak atau tidak valid.");
+        }
+      }
+
+      if (q.gambar && q.gambar.tipe === "diagram") {
+        const diagramResult = renderDiagramTemplate({ archetype: q.gambar.archetype, ...(q.gambar.data || {}) });
+        if (!diagramResult.svg) {
+          qReasons.push(`Spesifikasi template diagram tidak valid: ${diagramResult.error}`);
+        } else {
+          q.gambar = { tipe: "svg", svg_content: diagramResult.svg, deskripsi_alt: q.gambar.deskripsi_alt || "" };
         }
       }
 

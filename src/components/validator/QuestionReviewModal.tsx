@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { LatexPreview } from "@/components/ui/LatexPreview";
 import { SvgIllustration } from "@/components/ui/SvgIllustration";
+import { ValidatorNoteText } from "@/components/ui/ValidatorNoteText";
 
 interface QuestionReviewModalProps {
   question: any;
@@ -34,7 +35,7 @@ export function QuestionReviewModal({
 }: QuestionReviewModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [activeAction, setActiveAction] = useState<"none" | "setujui" | "tolak" | "revisi">("none");
-  const [actionNotes, setActionNotes] = useState("");
+  const [actionNotes, setActionNotes] = useState(question.validationNotes || "");
   const [actionError, setActionError] = useState("");
 
   const isSelf = question.authorId === currentUserId;
@@ -107,6 +108,22 @@ export function QuestionReviewModal({
                 </strong>
                 <p className="text-[11.5px] mt-0.5 text-rose-700 leading-relaxed">
                   Anda adalah pengunggah (author) dari butir soal ini. Sesuai prinsip integritas asesmen, validator dilarang menelaah, menyetujui, atau menolak butir soal ciptaannya sendiri. Tombol aksi telah dinonaktifkan dan API backend akan menolak segala upaya validasi.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Catatan Telaah Sebelumnya (Konteks jika Butir Soal Pernah Direvisi/Ditolak) */}
+          {question.validationNotes && (
+            <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-3">
+              <AlertTriangle className="w-4.5 h-4.5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1.5 flex-1">
+                <strong className="font-bold text-amber-900 block">
+                  Catatan Telaah Sebelumnya (Status Saat Ini: {question.status || "–"}):
+                </strong>
+                <ValidatorNoteText text={question.validationNotes} />
+                <p className="text-[11px] text-amber-700">
+                  Catatan ini sudah dimuat ke kolom di bawah saat Anda memilih "Minta Revisi" atau "Tolak Soal" — silakan sunting atau lengkapi sebelum mengirim ulang.
                 </p>
               </div>
             </div>

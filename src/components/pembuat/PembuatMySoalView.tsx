@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Question } from "@/db/schema";
 import { StatusBadge } from "@/components/ui/Badge";
+import { ValidatorNoteText } from "@/components/ui/ValidatorNoteText";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { isJenjangMatch } from "@/lib/jenjang-utils";
 
@@ -208,7 +209,7 @@ export function PembuatMySoalView({ questions, userEmail }: PembuatMySoalViewPro
                         {q.validationNotes ? (
                           <div className="flex items-start gap-1 text-[11px] text-amber-900 bg-amber-50 p-1.5 rounded border border-amber-200">
                             <AlertCircle className="w-3 h-3 text-amber-600 shrink-0 mt-0.5" />
-                            <span>{q.validationNotes}</span>
+                            <ValidatorNoteText text={q.validationNotes} />
                           </div>
                         ) : (
                           <span className="text-slate-400">–</span>

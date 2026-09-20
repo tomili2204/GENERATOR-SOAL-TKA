@@ -75,6 +75,7 @@ export async function GET(req: NextRequest) {
         stimulusId: questions.stimulusId,
         sumber: questions.sumber,
         status: questions.status,
+        validationNotes: questions.validationNotes,
         authorId: questions.authorId,
         createdAt: questions.createdAt,
         payload: questions.payload,
