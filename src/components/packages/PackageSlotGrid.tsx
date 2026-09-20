@@ -135,7 +135,7 @@ export function PackageSlotGrid({ slots, onSelectSlot, isValidator = false }: Pa
                     <RefreshCw className="w-3 h-3" />
                     <span>Ganti Soal</span>
                   </span>
-                ) : q.status === "direvisi" ? (
+                ) : (q.status === "direvisi" || q.status === "perlu_revisi") ? (
                   <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600">
                     <Edit3 className="w-3 h-3" />
                     <span>Perbaiki</span>
