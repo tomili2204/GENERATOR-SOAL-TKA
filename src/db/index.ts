@@ -87,6 +87,9 @@ export async function ensureTablesCreated() {
     );
 
     ALTER TABLE tema_konteks_pool ADD COLUMN IF NOT EXISTS jenjang_cocok JSONB DEFAULT '["SD/MI","SMP/MTs","SMA/MA","SMK/MAK"]'::jsonb NOT NULL;
+
+    ALTER TABLE questions ADD COLUMN IF NOT EXISTS previous_payload JSONB;
+    ALTER TABLE questions ADD COLUMN IF NOT EXISTS previous_validation_notes TEXT;
   `;
 
   const dataDir = path.join(process.cwd(), ".data", "soal_ayotka_pg");
@@ -239,6 +242,8 @@ export async function ensureTablesCreated() {
     ALTER TABLE questions ADD COLUMN IF NOT EXISTS stimulus_id TEXT;
     ALTER TABLE questions ADD COLUMN IF NOT EXISTS paket_id TEXT;
     ALTER TABLE questions ADD COLUMN IF NOT EXISTS sumber TEXT DEFAULT 'manual_upload';
+    ALTER TABLE questions ADD COLUMN IF NOT EXISTS previous_payload JSONB;
+    ALTER TABLE questions ADD COLUMN IF NOT EXISTS previous_validation_notes TEXT;
 
     CREATE TABLE IF NOT EXISTS audit_logs (
       id TEXT PRIMARY KEY,

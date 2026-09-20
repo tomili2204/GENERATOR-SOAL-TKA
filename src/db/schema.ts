@@ -145,6 +145,8 @@ export const questions = soalSchema.table("questions", {
   validationNotes: text("validation_notes"),
   validatedAt: timestamp("validated_at", { withTimezone: true }),
   payload: jsonb("payload").default({}).notNull(), // Menyimpan soal_text, opsi, gambar, kunci_jawaban, pembahasan
+  previousPayload: jsonb("previous_payload"), // Snapshot payload sebelum revisi terakhir, untuk tampilan before-after validator
+  previousValidationNotes: text("previous_validation_notes"), // Catatan validator yang berlaku sebelum revisi terakhir
   temaKonteks: text("tema_konteks"), // Ringkasan tema konteks soal (nullable)
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

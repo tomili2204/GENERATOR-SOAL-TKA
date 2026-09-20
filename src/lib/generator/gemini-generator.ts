@@ -497,6 +497,157 @@ STANDAR TEKNIS KUALITAS SVG:
 - Seluruh elemen (bentuk maupun teks) WAJIB berada penuh di dalam batas viewBox, tidak ada yang terpotong di tepi kanvas. Beri jarak antar-label agar tidak saling tumpang tindih. Gunakan text-anchor="middle" untuk label yang mengacu ke tengah sebuah objek/sumbu. Pastikan setiap tag <g>/<text>/<tspan> yang dibuka selalu ditutup, dan svg_content tidak boleh terpotong sebelum tag "</svg>" akhir.`;
 }
 
+// SYSTEM PROMPT UNTUK PERBAIKAN SATU BUTIR SOAL BERDASARKAN CATATAN VALIDATOR
+const AI_REVISION_SYSTEM_PROMPT = `Anda adalah editor soal Tes Kemampuan Akademik (TKA) profesional untuk Kementerian Pendidikan Dasar dan Menengah RI. Tugas Anda: merevisi SATU butir soal yang sudah ada berdasarkan catatan perbaikan spesifik dari validator penelaah, TANPA mengubah hal-hal di luar yang diminta.
+
+ATURAN WAJIB:
+1. Perbaiki HANYA sesuai catatan validator yang diberikan. Jangan mengubah bentuk soal, jenis soal, atau taksonomi elemen/kompetensi kecuali validator secara eksplisit memintanya.
+2. Jika catatan meminta redaksi ulang pertanyaan, opsi, atau pembahasan, tulis ulang secara utuh dan konsisten — jangan setengah-setengah atau menyisakan bagian lama yang kontradiktif dengan bagian baru.
+3. Jika catatan menyebutkan hasil perhitungan tidak bulat/tidak rapi, PILIH SALAH SATU: sesuaikan angka pada soal, ATAU ubah redaksi pertanyaan (misalnya menjadi "tambahan/kekurangan minimal") agar tetap valid secara matematis dan kunci jawabannya benar-benar cocok dengan salah satu opsi yang ada (jangan menghasilkan kunci yang tidak ada di daftar opsi).
+4. Field "pembahasan" WAJIB diuraikan bertingkat ke bawah per baris memakai karakter newline (\\n) untuk tiap langkah (contoh: "Diketahui: ...\\nLangkah 1: ...\\nLangkah 2: ...\\nSimpulan: ..."), jelas dan langsung ke inti. DILARANG memakai gaya bahasa yang terasa seperti keluaran AI generik (hindari frasa seperti "Tentu, berikut adalah...", "Sebagai AI...", "Baik, saya akan...", dsb) — tulis sebagaimana pendidik manusia menulis kunci pembahasan.
+5. Notasi matematika memakai LaTeX inline $...$ atau display $$...$$; di dalam JSON, escape backslash ganda (\\\\frac, \\\\times, \\\\sqrt, dst).
+6. Field "gambar": jika catatan validator TIDAK menyinggung ilustrasi/diagram sama sekali, kembalikan "gambar": null (sistem akan otomatis mempertahankan ilustrasi asli). Jika catatan validator secara eksplisit meminta perbaikan visual, sertakan revisi "gambar" mengikuti salah satu format: {"tipe": "svg", "svg_content": "<svg viewBox=\\"0 0 480 300\\" width=\\"100%\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>", "deskripsi_alt": "..."} untuk geometri/denah bebas, atau {"tipe": "diagram", "archetype": "diagram_batang"|"diagram_lingkaran"|"model_pecahan"|"garis_bilangan", "data": {...}, "deskripsi_alt": "..."} untuk diagram data/pecahan/garis bilangan (parameter data mengikuti skema masing-masing archetype).
+7. Kembalikan HANYA array JSON valid berisi TEPAT SATU objek, tanpa markdown code fence dan tanpa teks penjelasan apa pun di luar JSON, dengan skema PERSIS:
+[{
+  "soal_text": string,
+  "opsi": [{"label": string, "text": string}] | null,
+  "pernyataan": [{"no": number, "text": string}] | null,
+  "kategori_respons": [string] | null,
+  "kunci_jawaban": [string],
+  "pembahasan": string,
+  "gambar": null | {"tipe": "svg", "svg_content": string, "deskripsi_alt": string} | {"tipe": "diagram", "archetype": string, "data": object, "deskripsi_alt": string}
+}]`;
+
+export interface ReviseQuestionInput {
+  jenjang: string;
+  mapel: string;
+  elemen: string;
+  subElemen?: string | null;
+  bentukSoal: string;
+  jenisSoal: string;
+  tingkatKesulitan?: string | null;
+  soalText: string;
+  opsi?: Array<{ label: string; text: string }> | null;
+  pernyataan?: Array<{ no: number; text: string }> | null;
+  kategoriRespons?: string[] | null;
+  kunciJawaban: string[];
+  pembahasan: string;
+  gambarTipe?: string | null;
+  validationNotes: string;
+}
+
+export interface ReviseQuestionResult {
+  success: boolean;
+  revised?: {
+    soal_text: string;
+    opsi?: Array<{ label: string; text: string }> | null;
+    pernyataan?: Array<{ no: number; text: string }> | null;
+    kategori_respons?: string[] | null;
+    kunci_jawaban: string[];
+    pembahasan: string;
+    gambar?: any;
+  };
+  error?: string;
+}
+
+/**
+ * Meminta AI merevisi satu butir soal berdasarkan catatan perbaikan validator.
+ * Hanya mengembalikan draf revisi (tidak menyimpan ke database) agar Pembuat Soal
+ * tetap meninjau dan menyetujui hasilnya sebelum dikirim ulang ke validator.
+ */
+export async function reviseQuestionWithAi(input: ReviseQuestionInput): Promise<ReviseQuestionResult> {
+  const storedConfig = await getStoredAiConfig();
+  const apiKey = storedConfig.apiKey;
+  if (!apiKey || !apiKey.trim()) {
+    return {
+      success: false,
+      error: "Kunci API Gemini belum dikonfigurasi oleh admin. Perbaikan otomatis oleh AI tidak dapat dijalankan.",
+    };
+  }
+
+  if (!input.validationNotes || !input.validationNotes.trim()) {
+    return { success: false, error: "Tidak ada catatan validator yang dapat dijadikan acuan perbaikan." };
+  }
+
+  const originalPayload = {
+    soal_text: input.soalText,
+    opsi: input.opsi || null,
+    pernyataan: input.pernyataan || null,
+    kategori_respons: input.kategoriRespons || null,
+    kunci_jawaban: input.kunciJawaban,
+    pembahasan: input.pembahasan,
+    gambar_tipe_saat_ini: input.gambarTipe || null,
+  };
+
+  const userPrompt = `Konteks butir soal:
+- Jenjang: ${input.jenjang}
+- Mapel: ${input.mapel}
+- Elemen: ${input.elemen}${input.subElemen ? ` | Sub Elemen: ${input.subElemen}` : ""}
+- Bentuk Soal: ${input.bentukSoal} | Jenis Soal: ${input.jenisSoal}
+- Tingkat Kesulitan: ${input.tingkatKesulitan || "-"}
+
+Butir soal SAAT INI (sebelum revisi):
+${JSON.stringify(originalPayload, null, 2)}
+
+CATATAN PERBAIKAN DARI VALIDATOR (wajib dipatuhi seluruhnya, poin demi poin):
+${input.validationNotes}
+
+Kembalikan array JSON berisi TEPAT SATU objek hasil revisi sesuai skema pada instruksi sistem. Jawaban WAJIB ringkas dan efisien token — jangan mengulang informasi, jangan menambahkan field lain di luar skema, dan jangan mengembalikan "gambar" ber-SVG kecuali benar-benar diminta oleh catatan validator.`;
+
+  const attemptOnce = async (): Promise<ReviseQuestionResult> => {
+    let rawText: string;
+    try {
+      const res = await callGeminiResilient({
+        apiKey,
+        preferredModel: storedConfig.modelName,
+        systemInstruction: AI_REVISION_SYSTEM_PROMPT,
+        userPrompt,
+        temperature: 0.4,
+      });
+      rawText = res.rawText;
+    } catch (err: any) {
+      return { success: false, error: err.message || "Gagal menghubungi Gemini API." };
+    }
+
+    let parsedArray: any[];
+    try {
+      parsedArray = parseGeminiJson(rawText);
+    } catch (err: any) {
+      return { success: false, error: `Gagal membaca hasil revisi dari AI: ${err.message}` };
+    }
+
+    const revised = parsedArray[0];
+    const hasValidKunci = Array.isArray(revised?.kunci_jawaban) && revised.kunci_jawaban.length > 0;
+    if (!revised || typeof revised !== "object" || !revised.soal_text || !revised.pembahasan || !hasValidKunci) {
+      return {
+        success: false,
+        error: "AI mengembalikan hasil revisi yang tidak lengkap (kemungkinan keluaran terpotong sebelum selesai).",
+      };
+    }
+
+    return {
+      success: true,
+      revised: {
+        soal_text: revised.soal_text,
+        opsi: revised.opsi ?? null,
+        pernyataan: revised.pernyataan ?? null,
+        kategori_respons: revised.kategori_respons ?? null,
+        kunci_jawaban: revised.kunci_jawaban,
+        pembahasan: revised.pembahasan,
+        gambar: revised.gambar ?? null,
+      },
+    };
+  };
+
+  // Keluaran LLM sesekali terpotong di tengah jalan; coba ulang sekali secara otomatis
+  // sebelum menyerah, karena percobaan kedua pada suhu yang sama seringkali berhasil.
+  let lastResult = await attemptOnce();
+  if (!lastResult.success) {
+    lastResult = await attemptOnce();
+  }
+  return lastResult;
+}
+
 export interface GenerateOptions {
   jenjang: string;
   mapel: string;

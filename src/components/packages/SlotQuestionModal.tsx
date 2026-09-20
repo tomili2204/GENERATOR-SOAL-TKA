@@ -21,6 +21,8 @@ import {
   Edit3,
   FileText,
   Image as ImageIcon,
+  Wand2,
+  Loader2,
 } from "lucide-react";
 
 interface SlotQuestionModalProps {
@@ -67,6 +69,11 @@ export function SlotQuestionModal({
 
   const [soalText, setSoalText] = useState(q?.payload?.soal_text || "");
   const [pembahasan, setPembahasan] = useState(q?.payload?.pembahasan || "");
+  const [gambar, setGambar] = useState<any>(q?.payload?.gambar || null);
+
+  // Perbaikan Otomatis oleh AI berdasarkan Catatan Validator
+  const [isAiRevising, setIsAiRevising] = useState(false);
+  const [aiError, setAiError] = useState("");
 
   // Form PG
   const [opsi, setOpsi] = useState(
@@ -113,6 +120,7 @@ export function SlotQuestionModal({
       setStimulusId(q.stimulusId || null);
       setSoalText(q.payload?.soal_text || "");
       setPembahasan(q.payload?.pembahasan || "");
+      setGambar(q.payload?.gambar || null);
       setOpsi(
         q.payload?.opsi?.length
           ? q.payload.opsi
@@ -146,6 +154,7 @@ export function SlotQuestionModal({
       setStimulusId(null);
       setSoalText("");
       setPembahasan("");
+      setGambar(null);
       setOpsi([
         { label: "A", text: "" },
         { label: "B", text: "" },
@@ -205,6 +214,7 @@ export function SlotQuestionModal({
           stimulus_id: jenisSoal === "grup" ? stimulusId : null,
           soal_text: soalText,
           pembahasan,
+          gambar,
           opsi: bentukSoal !== "PGK_KATEGORI" ? opsi : [],
           pernyataan: bentukSoal === "PGK_KATEGORI" ? pernyataan : [],
           kategori_respons: bentukSoal === "PGK_KATEGORI" ? kategoriRespons : [],
@@ -223,6 +233,38 @@ export function SlotQuestionModal({
       setErrorMessage(err.message);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Handler Perbaikan Otomatis oleh AI berdasarkan Catatan Validator
+  const handleAiRevise = async () => {
+    setAiError("");
+    setIsAiRevising(true);
+    try {
+      const res = await fetch(`/api/packages/${packageData.id}/slots/${slot.nomorUrut}/ai-revise`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Gagal memperoleh revisi dari AI.");
+      }
+
+      setSoalText(data.data.soal_text || "");
+      setPembahasan(data.data.pembahasan || "");
+      setGambar(data.data.gambar || null);
+      if (bentukSoal === "PGK_KATEGORI") {
+        if (data.data.pernyataan?.length) setPernyataan(data.data.pernyataan);
+        if (data.data.kategori_respons?.length) setKategoriRespons(data.data.kategori_respons);
+      } else if (data.data.opsi?.length) {
+        setOpsi(data.data.opsi);
+      }
+      if (data.data.kunci_jawaban?.length) setKunciJawaban(data.data.kunci_jawaban);
+
+      setMode("edit");
+    } catch (err: any) {
+      setAiError(err.message || "Gagal memperbaiki soal dengan AI.");
+    } finally {
+      setIsAiRevising(false);
     }
   };
 
@@ -251,6 +293,25 @@ export function SlotQuestionModal({
           </div>
 
           <div className="flex items-center gap-2">
+            {slot.isFilled &&
+              !isValidator &&
+              (q?.status === "direvisi" || q?.status === "perlu_revisi") &&
+              q?.validationNotes && (
+                <button
+                  type="button"
+                  onClick={handleAiRevise}
+                  disabled={isAiRevising}
+                  title="Minta AI membuat draf revisi berdasarkan catatan validator (tetap perlu Anda tinjau & simpan)"
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-500 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isAiRevising ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Wand2 className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isAiRevising ? "Memperbaiki..." : "Perbaiki dengan AI"}</span>
+                </button>
+              )}
             {slot.isFilled && q?.status !== "disetujui" && !isValidator && (
               <button
                 type="button"
@@ -299,6 +360,16 @@ export function SlotQuestionModal({
             <div className="space-y-1.5">
               <span className="font-bold block">Catatan Perbaikan Validator:</span>
               <ValidatorNoteText text={q.validationNotes || "Perlu penyesuaian formula atau redaksi."} />
+            </div>
+          </div>
+        )}
+
+        {aiError && (
+          <div className="bg-rose-50 border-b border-rose-200 px-6 py-3 flex items-start gap-2.5 text-xs text-rose-900 shrink-0">
+            <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold block">Perbaikan AI Gagal:</span>
+              <span>{aiError}</span>
             </div>
           </div>
         )}
@@ -551,6 +622,22 @@ export function SlotQuestionModal({
                   </div>
                 )}
               </div>
+
+              {/* Pratinjau Ilustrasi (dipertahankan otomatis kecuali diganti lewat Perbaiki dengan AI) */}
+              {gambar && gambar.tipe === "svg" && gambar.svg_content && (
+                <div>
+                  <label className="font-semibold text-slate-900 block mb-1.5 text-xs">
+                    Ilustrasi / Diagram Pendukung
+                  </label>
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                    <SvgIllustration svgContent={gambar.svg_content} altText={gambar.deskripsi_alt} />
+                    <p className="text-[11px] text-slate-400 mt-1.5">
+                      Ilustrasi ini dipertahankan otomatis saat disimpan. Gunakan tombol "Perbaiki dengan AI" di
+                      pojok kanan atas bila catatan validator meminta perubahan visual.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Opsi Jawaban (PG / PGK_MCMA) */}
               {bentukSoal !== "PGK_KATEGORI" ? (

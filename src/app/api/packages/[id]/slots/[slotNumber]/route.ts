@@ -118,7 +118,9 @@ export async function POST(
       actionType = existingQ.status === "ditolak" ? "REPLACE_REJECTED_SLOT" : "UPDATE_REVISED_SLOT";
       savedQuestionId = existingQ.id;
 
-      // Update butir soal yang ada dan kembalikan status ke 'menunggu_validasi'
+      // Update butir soal yang ada dan kembalikan status ke 'menunggu_validasi'.
+      // Simpan snapshot versi sebelumnya (payload & catatan validator) agar validator
+      // berikutnya dapat membandingkan versi lama vs versi hasil perbaikan (before-after).
       await db
         .update(questions)
         .set({
@@ -135,6 +137,8 @@ export async function POST(
           validationNotes: null,
           validatedAt: null,
           payload,
+          previousPayload: existingQ.payload,
+          previousValidationNotes: existingQ.validationNotes,
           temaKonteks: body.tema_konteks || body.temaKonteks || null,
           updatedAt: new Date(),
         })

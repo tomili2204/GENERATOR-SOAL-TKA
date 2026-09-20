@@ -79,6 +79,8 @@ export async function GET(req: NextRequest) {
         authorId: questions.authorId,
         createdAt: questions.createdAt,
         payload: questions.payload,
+        previousPayload: questions.previousPayload,
+        previousValidationNotes: questions.previousValidationNotes,
         authorName: users.name,
         authorEmail: users.email,
       })

@@ -19,6 +19,7 @@ import {
 import { LatexPreview } from "@/components/ui/LatexPreview";
 import { SvgIllustration } from "@/components/ui/SvgIllustration";
 import { ValidatorNoteText } from "@/components/ui/ValidatorNoteText";
+import { RevisionComparisonPanel } from "./RevisionComparisonPanel";
 
 interface QuestionReviewModalProps {
   question: any;
@@ -127,6 +128,15 @@ export function QuestionReviewModal({
                 </p>
               </div>
             </div>
+          )}
+
+          {/* Perbandingan Versi Lama vs. Hasil Perbaikan (jika butir soal ini pernah direvisi) */}
+          {question.previousPayload && (
+            <RevisionComparisonPanel
+              previous={question.previousPayload}
+              current={payload}
+              bentukSoal={question.bentukSoal}
+            />
           )}
 
           {/* Rincian Taksonomi & Kisi-Kisi */}
