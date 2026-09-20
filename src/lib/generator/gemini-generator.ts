@@ -13,6 +13,7 @@ import { eq, and, count } from "drizzle-orm";
 import { validateLatexDelimiters } from "@/lib/validations/latex";
 import { generatePackageCode, calculatePackageStatus } from "@/lib/validations/package-blueprint";
 import { deepRepairLatex, preprocessJsonForLatex } from "@/lib/latex/latex-repair";
+import { validateAndRepairSvg } from "@/lib/validations/svg";
 import { generateMockGeminiBatchResponse as mockDataBatchResponse } from "./mock-data";
 import { selectThemeForGeneration } from "./theme-selector";
 import { normalizeJenjang } from "@/lib/jenjang-utils";
@@ -96,6 +97,8 @@ PRINSIP KUALITAS SOAL (MUTLAK WAJIB DIPATUHI):
    - Pada butir soal yang melibatkan geometri bangun datar/ruang, denah, sudut, irisan/gabungan bidang, atau diagram proporsional: WAJIB LANGSUNG DIGAMBARKAN KODE SVG SECARA LENGKAP & MANDIRI pada field "gambar" dengan format: {"tipe": "svg", "svg_content": "<svg viewBox=\"0 0 480 300\" width=\"100%\" xmlns=\"http://www.w3.org/2000/svg\" ...>...</svg>", "deskripsi_alt": "..."}.
    - DILARANG KERAS menggunakan status placeholder "perlu_ilustrasi". Seluruh ilustrasi visual yang dibutuhkan wajib langsung digambar menggunakan elemen SVG yang valid (<rect>, <circle>, <polygon>, <path>, <line>, <text>, dll.) dengan dimensi ukuran angka yang proporsional, rapi, dan jelas terbaca.
    - Jika butir soal memang murni berbasis narasi/perhitungan aljabar tanpa perlu visual, isi field "gambar" dengan null.
+   - KUALITAS TEKNIS SVG WAJIB DIJAGA KETAT: seluruh koordinat elemen (x, y, cx, cy, titik path/polygon) WAJIB berada di dalam batas viewBox, DILARANG ada bagian gambar atau teks yang terpotong/keluar kanvas. Label teks antar-elemen DILARANG saling tumpang tindih atau bertabrakan dengan garis/bentuk lain — beri jarak yang cukup. Setiap tag pembuka elemen berpasangan (<g>, <text>, <tspan>) WAJIB memiliki tag penutup yang sesuai, jangan pernah membiarkan svg_content terpotong sebelum tag "</svg>" penutup.
+   - Untuk label angka/teks yang diposisikan di tengah suatu bentuk atau sumbu, WAJIB gunakan atribut text-anchor="middle" (dan dominant-baseline="middle" bila perlu) agar teks benar-benar center dan tidak melenceng dari objek yang dijelaskan.
 4. KONTEKS REALISTIS OTENTIK INDONESIA & ANTI-MONOTONI (LARANGAN KLISÉ):
    - Gunakan konteks nyata Nusantara yang kaya dan bervariasi: kegiatan bazar/UMKM, resep kue tradisional proporsional, kalender jadwal latihan bersama dengan tanggal awal berbeda, denah rumah berskala, ketebalan dinding kayu wadah, pembagian bantuan posko bencana, sistem tarif parkir/transportasi bertingkat, penjualan kerajinan daerah, data energi panel surya sekolah, tiket penyeberangan kapal ferry, panen hidroponik, dll.
    - DILARANG KERAS menggunakan nama klise yang monoton dan berulang seperti 'Maju Bersama', 'Maju Jaya', 'Makmur Bersama', atau tokoh yang selalu bernama 'Budi' dan 'Siti'!
@@ -485,7 +488,8 @@ STANDAR TEKNIS KUALITAS SVG:
 - Gunakan viewBox="0 0 480 260" dengan lebar responsive width="100%".
 - Padukan warna modern dan ramah mata (indigo #4f46e5, emerald #059669, amber #d97706, slate #475569, background halus #f8fafc).
 - Gunakan font-family="system-ui, sans-serif" dengan font-size minimal 12-14 agar teks angka dan label terbaca tajam di layar handphone dan komputer siswa.
-- DILARANG KERAS mengembalikan status placeholder "perlu_ilustrasi". Seluruh visualisasi wajib berupa kode SVG mandiri yang valid dan langsung render!`;
+- DILARANG KERAS mengembalikan status placeholder "perlu_ilustrasi". Seluruh visualisasi wajib berupa kode SVG mandiri yang valid dan langsung render!
+- Seluruh elemen (bentuk maupun teks) WAJIB berada penuh di dalam batas viewBox, tidak ada yang terpotong di tepi kanvas. Beri jarak antar-label agar tidak saling tumpang tindih. Gunakan text-anchor="middle" untuk label yang mengacu ke tengah sebuah objek/sumbu. Pastikan setiap tag <g>/<text>/<tspan> yang dibuka selalu ditutup, dan svg_content tidak boleh terpotong sebelum tag "</svg>" akhir.`;
 }
 
 export interface GenerateOptions {
@@ -1046,6 +1050,16 @@ ${formatArchetypeGuidancePrompt(deterministicSlotPlans.slice(chunk1Count), jenja
       }
     }
 
+    // D3. Pengecekan & Perbaikan Otomatis Kualitas SVG (anti-tag berbahaya & anti-output terpotong)
+    if (q.gambar && q.gambar.tipe === "svg") {
+      const svgResult = validateAndRepairSvg(q.gambar.svg_content);
+      if (!svgResult.content) {
+        reasons.push(`Ilustrasi SVG tidak valid: ${svgResult.issues.join("; ")}`);
+      } else {
+        q.gambar.svg_content = svgResult.content;
+      }
+    }
+
     // E. Pemetaan Stimulus
     let finalStimulusId: string | null = null;
     if (q.jenis_soal === "grup") {
@@ -1238,6 +1252,15 @@ ${curriculumGuidance}`;
       if (q.jenis_soal === "grup") {
         if (!q.stimulus_id_sementara || rejectedStimuli[q.stimulus_id_sementara]) {
           qReasons.push("Stimulus yang terkait ditolak atau tidak valid.");
+        }
+      }
+
+      if (q.gambar && q.gambar.tipe === "svg") {
+        const svgResult = validateAndRepairSvg(q.gambar.svg_content);
+        if (!svgResult.content) {
+          qReasons.push(`Ilustrasi SVG tidak valid: ${svgResult.issues.join("; ")}`);
+        } else {
+          q.gambar.svg_content = svgResult.content;
         }
       }
 

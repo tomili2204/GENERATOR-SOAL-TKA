@@ -18,6 +18,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { LatexPreview } from "@/components/ui/LatexPreview";
+import { SvgIllustration } from "@/components/ui/SvgIllustration";
 import { StimulusSelector, StimulusItem } from "./StimulusSelector";
 import { validateLatexDelimiters } from "@/lib/validations/latex";
 import {
@@ -801,6 +802,14 @@ export function ManualQuestionForm() {
                     placeholder="<svg ...>...</svg>"
                     className="w-full font-mono text-xs bg-white border border-slate-300 rounded p-2 focus:outline-none"
                   />
+                  {gambarSvg.trim() && (
+                    <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                        Pratinjau
+                      </span>
+                      <SvgIllustration svgContent={gambarSvg} altText={gambarAlt} />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

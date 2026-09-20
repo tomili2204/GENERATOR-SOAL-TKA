@@ -17,6 +17,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { LatexPreview } from "@/components/ui/LatexPreview";
+import { SvgIllustration } from "@/components/ui/SvgIllustration";
 
 interface QuestionReviewModalProps {
   question: any;
@@ -185,9 +186,9 @@ export function QuestionReviewModal({
                   />
                 )}
                 {payload.gambar.tipe === "svg" && payload.gambar.svg_content && (
-                  <div
-                    className="max-h-48 overflow-auto mx-auto inline-block"
-                    dangerouslySetInnerHTML={{ __html: payload.gambar.svg_content }}
+                  <SvgIllustration
+                    svgContent={payload.gambar.svg_content}
+                    altText={payload.gambar.deskripsi_alt}
                   />
                 )}
                 {payload.gambar.tipe === "perlu_ilustrasi" && (

@@ -1,4 +1,5 @@
 import { validateLatexDelimiters } from "./latex";
+import { validateAndRepairSvg } from "./svg";
 import {
   JenjangType,
   BentukSoalType,
@@ -230,6 +231,16 @@ export function validateQuestionData(data: Partial<ValidateQuestionInput>): Vali
         );
       }
     });
+  }
+
+  // 11. Validasi & Perbaikan Otomatis Ilustrasi SVG (anti-tag berbahaya & anti-markup rusak)
+  if (data.gambar && data.gambar.tipe === "svg") {
+    const svgResult = validateAndRepairSvg(data.gambar.svg_content);
+    if (!svgResult.content) {
+      errors.push(`Ilustrasi SVG tidak valid: ${svgResult.issues.join("; ")}`);
+    } else {
+      data.gambar.svg_content = svgResult.content;
+    }
   }
 
   return {

@@ -6,6 +6,7 @@ import { Question } from "@/db/schema";
 import { StatusBadge } from "@/components/ui/Badge";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { LatexPreview } from "@/components/ui/LatexPreview";
+import { SvgIllustration } from "@/components/ui/SvgIllustration";
 import { isJenjangMatch } from "@/lib/jenjang-utils";
 import {
   Search,
@@ -612,9 +613,9 @@ export function AdminAllSoalTableView({
                       <span className="text-[11px] font-bold font-mono uppercase tracking-wider text-slate-500 mb-2">
                         Diagram Geometri / Visual
                       </span>
-                      <div
-                        dangerouslySetInnerHTML={{ __html: selectedQuestion.payload.gambar.svg_content }}
-                        className="max-w-full overflow-x-auto"
+                      <SvgIllustration
+                        svgContent={selectedQuestion.payload.gambar.svg_content}
+                        altText={selectedQuestion.payload.gambar.deskripsi_alt}
                       />
                     </div>
                   )}

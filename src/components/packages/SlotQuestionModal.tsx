@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { LatexPreview } from "@/components/ui/LatexPreview";
+import { SvgIllustration } from "@/components/ui/SvgIllustration";
 import { validateLatexDelimiters } from "@/lib/validations/latex";
 import { StimulusSelector } from "@/components/pembuat/StimulusSelector";
 import { SlotData } from "./PackageSlotGrid";
@@ -348,9 +349,9 @@ export function SlotQuestionModal({
                   </label>
                   <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 flex flex-col items-center justify-center">
                     {q.payload.gambar.tipe === "svg" && q.payload.gambar.svg_content && (
-                      <div
-                        className="w-full max-w-xl mx-auto flex justify-center overflow-x-auto"
-                        dangerouslySetInnerHTML={{ __html: q.payload.gambar.svg_content }}
+                      <SvgIllustration
+                        svgContent={q.payload.gambar.svg_content}
+                        altText={q.payload.gambar.deskripsi_alt}
                       />
                     )}
                     {q.payload.gambar.tipe === "url" && q.payload.gambar.url && (
