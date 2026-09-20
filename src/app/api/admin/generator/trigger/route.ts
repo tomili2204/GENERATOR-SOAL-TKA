@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
       modelName,
       temperature,
       apiKey,
+      strictSvgMode,
     } = body;
 
     if (!jenjang || !mapel) {
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
       modelName,
       temperature: typeof temperature === "number" ? temperature : undefined,
       apiKey: sanitizedKey,
+      strictSvgMode: typeof strictSvgMode === "boolean" ? strictSvgMode : undefined,
     });
 
     return NextResponse.json({

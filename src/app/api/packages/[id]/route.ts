@@ -143,6 +143,7 @@ export async function GET(
           author,
         },
         currentUserId: user.id,
+        isAdmin: hasRole(user, "admin"),
         progress,
         slots,
       },

@@ -18,6 +18,15 @@ import { selectThemeForGeneration } from "./theme-selector";
 import { normalizeJenjang } from "@/lib/jenjang-utils";
 import { validateLanguageTextComplexity, isLanguageSubject, countWords } from "./text-complexity";
 import { jsonrepair } from "jsonrepair";
+import { fetchRecentQuestionsMemory } from "./sliding-window-memory";
+import {
+  generateDeterministicSlotPlan,
+  formatArchetypeGuidancePrompt,
+} from "./archetypes-catalog";
+import {
+  evaluateBatchSimilarity,
+  checkQuestionSimilarity,
+} from "./similarity-checker";
 
 // SYSTEM PROMPT RESMI BSKAP KEMENDIKDASMEN (TERINTEGRASI MATRIKS ASESMEN RESMI PUSMENDIK & DEFANTRI)
 export const BSKAP_SYSTEM_PROMPT = `Anda adalah pengembang soal Tes Kemampuan Akademik (TKA) profesional, bekerja untuk Kementerian Pendidikan Dasar dan Menengah RI. Tugas Anda: menghasilkan soal yang gaya, format, dan tingkat kesulitannya meniru soal TKA resmi seakurat mungkin, berdasarkan kerangka Perkaban BSKAP No. 45/2025 (SMA/MA & SMK/MAK) dan No. 47/2025 (SD/MI & SMP/MTs).
@@ -123,6 +132,7 @@ export interface StoredAiConfig {
   modelName: string;
   temperature: number;
   customPromptPrefix?: string;
+  strictSvgMode?: boolean;
 }
 
 /**
@@ -145,6 +155,7 @@ export async function getStoredAiConfig(): Promise<StoredAiConfig> {
         modelName: val.modelName || process.env.GEMINI_MODEL || "gemini-3-flash-preview",
         temperature: typeof val.temperature === "number" ? val.temperature : 0.7,
         customPromptPrefix: val.customPromptPrefix || "",
+        strictSvgMode: !!val.strictSvgMode,
       };
     }
   } catch (err) {
@@ -155,6 +166,7 @@ export async function getStoredAiConfig(): Promise<StoredAiConfig> {
     apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "",
     modelName: process.env.GEMINI_MODEL || "gemini-3-flash-preview",
     temperature: 0.7,
+    strictSvgMode: false,
   };
 }
 
@@ -448,6 +460,34 @@ export function getCurriculumPromptContext(jenjang: string, mapel: string): stri
   return "";
 }
 
+export function getStrictSvgPromptInstructions(jenjang: string, mapel: string): string {
+  const isMat = mapel.toLowerCase().includes("matematika");
+  const isSd = jenjang.includes("SD");
+
+  return `\n\n=== ATURAN KETAT VISUALISASI SVG MANDIRI (STRICT SVG MODE AKTIF - WAJIB DIPATUHI) ===
+Paket soal ini WAJIB KAYA AKAN REPRESENTASI VISUAL! Dilarang membiarkan soal hanya berupa teks narasi jika dapat divisualisasikan.
+MINIMAL 6 SAMPAI 10 BUTIR SOAL DALAM PAKET INI WAJIB MEMILIKI FIELD "gambar" YANG BERISI KODE SVG MANDIRI LENGKAP:
+{"tipe": "svg", "svg_content": "<svg viewBox=\\"0 0 480 260\\" width=\\"100%\\" xmlns=\\"http://www.w3.org/2000/svg\\" ...>...</svg>", "deskripsi_alt": "..."}.
+
+ATURAN SPESIFIK VISUALISASI PER TOPIK:
+${isMat ? `1. DATA DAN PELUANG:
+   - WAJIB menyajikan stimulus data dalam bentuk DIAGRAM BATANG SVG, DIAGRAM GARIS SVG, atau DIAGRAM LINGKARAN SVG dengan sumbu (X/Y), skala angka, legenda warna, dan judul yang rapi (DILARANG hanya tabel teks biasa).
+2. GEOMETRI DAN PENGUKURAN:
+   - WAJIB menyertakan DIAGRAM BIDANG / BANGUN RUANG / DENAH SVG (misalnya denah taman, irisan bangun, segitiga siku-siku Pythagoras, jaring-jaring bangun, bangun gabungan) lengkap dengan label dimensi (panjang, lebar, jari-jari, sudut) yang proporsional dan jelas.
+3. BILANGAN DAN PECAHAN:
+   ${isSd ? `- Pada soal pecahan, WAJIB menyertakan MODEL VISUAL ARSIRAN PECAHAN SVG (lingkaran kue/pizza terbagi rata berarsir atau deretan persegi panjang berarsir) agar siswa SD dapat mengamati konsep pecahan secara visual konkret.
+   - Pada operasi hitung atau urutan bilangan bertanda, sertakan visual GARIS BILANGAN BERTANDA SVG dengan titik-titik nilai.` : `- Pada perbandingan, rasio, atau operasi bertanda, sertakan visual GARIS BILANGAN SVG atau MODEL DIAGRAM BATANG RASIO SVG.`}` : `1. WACANA INFORMASI & DATA:
+   - Pada butir soal berbasis wacana informasi/fakta, sertakan KARTU INFOGRAFIK RINGKAS SVG (kotak kartu dengan ikon SVG sederhana, sorotan angka fakta/persentase, atau bagan visual).
+2. TEKS PETUNJUK / PROSEDUR:
+   - Sertakan DIAGRAM ALUR / BAGAN LANGKAH KERJA SVG yang menarik dan mudah dipahami siswa.`}
+
+STANDAR TEKNIS KUALITAS SVG:
+- Gunakan viewBox="0 0 480 260" dengan lebar responsive width="100%".
+- Padukan warna modern dan ramah mata (indigo #4f46e5, emerald #059669, amber #d97706, slate #475569, background halus #f8fafc).
+- Gunakan font-family="system-ui, sans-serif" dengan font-size minimal 12-14 agar teks angka dan label terbaca tajam di layar handphone dan komputer siswa.
+- DILARANG KERAS mengembalikan status placeholder "perlu_ilustrasi". Seluruh visualisasi wajib berupa kode SVG mandiri yang valid dan langsung render!`;
+}
+
 export interface GenerateOptions {
   jenjang: string;
   mapel: string;
@@ -466,6 +506,7 @@ export interface GenerateOptions {
   modelName?: string;
   temperature?: number;
   apiKey?: string;
+  strictSvgMode?: boolean;
 }
 
 export interface GenerationResult {
@@ -594,13 +635,37 @@ Tema ini HANYA bungkus cerita/konteks — konten yang diuji tetap harus elemen d
 Untuk tiap soal, sertakan juga field "tema_konteks": string (2-5 kata, ringkasan spesifik konteks soal ini).`;
   }
 
-  const activeSystemPrompt = `${BSKAP_SYSTEM_PROMPT}${dynamicContextBlock}`;
+  // Lapis 1: Dynamic Negative Memory (Sliding Window 90 butir soal terakhir dari DB)
+  const recentMemory = await fetchRecentQuestionsMemory(jenjang, mapel, 90);
+
+  // Lapis 2 & 3: Penetapan Deterministik Arketipe & Matriks Kombinatorika Dinamis
+  const deterministicSlotPlans = generateDeterministicSlotPlan(
+    totalDiminta,
+    jenjang,
+    mapel,
+    options.selectedElements
+  );
+  const archetypePromptBlock = formatArchetypeGuidancePrompt(
+    deterministicSlotPlans,
+    jenjang,
+    mapel
+  );
+
+  const isStrictSvg = typeof options.strictSvgMode === "boolean" ? options.strictSvgMode : !!storedConfig.strictSvgMode;
+  const strictSvgBlock = isStrictSvg ? getStrictSvgPromptInstructions(jenjang, mapel) : "";
+
+  const activeSystemPrompt = `${BSKAP_SYSTEM_PROMPT}${dynamicContextBlock}${strictSvgBlock}${recentMemory.promptBlock}`;
 
   // Prompt Pengguna Target Distribusi
   let userPrompt = `Hasilkan tepat ${totalDiminta} butir soal TKA berkualitas tinggi dengan distribusi bentuk soal sekitar ${distB.PG} PG, ${distB.PGK_MCMA} PGK_MCMA, ${distB.PGK_KATEGORI} PGK_KATEGORI, dan distribusi tingkat kesulitan sekitar ${distK.rendah} rendah, ${distK.sedang} sedang, ${distK.tinggi} tinggi untuk jenjang ${jenjang} dan mata pelajaran ${mapel}.
 
 Wajib menuntut penalaran bertingkat (multi-step HOTS), menggunakan konteks nyata Indonesia, menyertakan data tabel Markdown untuk stimulus grup, dan memastikan butir soal grup 100% mengacu pada stimulus.
-${curriculumGuidance}`;
+${curriculumGuidance}
+${archetypePromptBlock}`;
+
+  if (isStrictSvg) {
+    userPrompt += `\n\nCATATAN KHUSUS VISUALISASI SVG: Mode Visualisasi SVG Ketat sedang aktif. Pastikan minimal 6-10 butir soal (khususnya data/diagram, geometri/denah, dan model pecahan arsiran) menyertakan kode SVG mandiri yang lengkap dan valid pada field "gambar".`;
+  }
 
   // Pembatasan Elemen Materi jika dipilih sebagian oleh admin
   let elementRestrictionPrompt = "";
@@ -705,11 +770,13 @@ DILARANG KERAS membuat soal di luar elemen materi di atas! Seluruh butir soal ($
         let p1 = `Hasilkan tepat ${chunk1Count} butir soal TKA berkualitas tinggi (bagian 1 dari 2) dengan distribusi bentuk soal sekitar ${distB1.PG} PG, ${distB1.PGK_MCMA} PGK_MCMA, ${distB1.PGK_KATEGORI} PGK_KATEGORI, dan distribusi tingkat kesulitan sekitar ${distK1.rendah} rendah, ${distK1.sedang} sedang, ${distK1.tinggi} tinggi untuk jenjang ${jenjang} dan mata pelajaran ${mapel}.
 
 Wajib penalaran bertingkat (multi-step HOTS), konteks nyata, tabel Markdown untuk stimulus grup, dan kohesi penuh.
-${curriculumGuidance}`;
+${curriculumGuidance}
+${formatArchetypeGuidancePrompt(deterministicSlotPlans.slice(0, chunk1Count), jenjang, mapel)}`;
         let p2 = `Hasilkan tepat ${chunk2Count} butir soal TKA berkualitas tinggi (bagian 2 dari 2) dengan distribusi bentuk soal sekitar ${distB2.PG} PG, ${distB2.PGK_MCMA} PGK_MCMA, ${distB2.PGK_KATEGORI} PGK_KATEGORI, dan distribusi tingkat kesulitan sekitar ${distK2.rendah} rendah, ${distK2.sedang} sedang, ${distK2.tinggi} tinggi untuk jenjang ${jenjang} dan mata pelajaran ${mapel}.
 
 Wajib penalaran bertingkat (multi-step HOTS), konteks nyata, tabel Markdown untuk stimulus grup, dan kohesi penuh.
-${curriculumGuidance}`;
+${curriculumGuidance}
+${formatArchetypeGuidancePrompt(deterministicSlotPlans.slice(chunk1Count), jenjang, mapel)}`;
 
         if (elementRestrictionPrompt) {
           p1 += elementRestrictionPrompt;
@@ -1183,6 +1250,30 @@ ${curriculumGuidance}`;
     }
   }
 
+  // 5D. Lapis 4: Evaluasi Kemiripan (Similarity Check) & Kalibrasi Observasi 5-7 Hari
+  const simEvaluation = evaluateBatchSimilarity(
+    validQuestions.map((vq, idx) => ({ soal_text: vq.soal_text, index: idx + 1 })),
+    recentMemory.rawStems,
+    true
+  );
+
+  const similarityLogs: Array<{ index: number; reason: string; itemTitle?: string }> = [];
+  if (recentMemory.rawStems.length > 0) {
+    similarityLogs.push({
+      index: 0,
+      reason: `[Observasi Kalibrasi Kemiripan Lapis 4] Skor Rata-rata: ${simEvaluation.averageScore}%, Skor Tertinggi: ${simEvaluation.maxScore}%, Indikasi Kemiripan Tinggi (>60%): ${simEvaluation.highSimilarityCount} butir. (Mode observasi aktif: pencatatan log tanpa penolakan otomatis).`,
+      itemTitle: "Kalibrasi Kemiripan AI",
+    });
+
+    for (const cl of simEvaluation.calibrationLogs) {
+      similarityLogs.push({
+        index: cl.itemIndex,
+        reason: `[Kalibrasi Kemiripan Butir #${cl.itemIndex}] Skor: ${cl.score}% (Frasa: ${cl.phraseOverlap}%, Kata: ${cl.wordOverlap}%). Pembanding: "${cl.comparisonSnippet}"`,
+        itemTitle: `Observasi Kemiripan Butir #${cl.itemIndex}`,
+      });
+    }
+  }
+
   // 6. Jika tidak ada soal yang lolos pemeriksaan sama sekali -> Gagalkan
   if (validQuestions.length === 0) {
     const completedAt = new Date();
@@ -1299,6 +1390,9 @@ ${curriculumGuidance}`;
     const itemCode = `${packageCode}-${slotNumber.toString().padStart(2, "0")}`;
     const questionId = `soal-ai-${Date.now()}-${slotNumber}-${Math.random().toString(36).substring(2, 6)}`;
 
+    const checkSim = checkQuestionSimilarity(vq.soal_text, recentMemory.rawStems, 60);
+    const assignedArchetype = deterministicSlotPlans[i]?.archetype?.nama || null;
+
     const payload = {
       soal_text: vq.soal_text,
       gambar: vq.gambar || null,
@@ -1307,6 +1401,10 @@ ${curriculumGuidance}`;
       kategori_respons: vq.kategori_respons || [],
       kunci_jawaban: vq.kunci_jawaban || [],
       pembahasan: vq.pembahasan,
+      // Metadata Keberagaman (Lapis 2 & Lapis 4)
+      target_arketipe: assignedArchetype,
+      similarity_score: checkSim.score,
+      similarity_pembanding: checkSim.comparedWithStem || null,
     };
 
     await db.insert(questions).values({
@@ -1355,7 +1453,7 @@ ${curriculumGuidance}`;
     totalDiterima: questionObjects.length,
     totalLolos: validQuestions.length,
     totalGagal: failedItems.length,
-    detailPemeriksaan: [...failedItems, ...themeWarnings, ...textComplexityLogs],
+    detailPemeriksaan: [...failedItems, ...themeWarnings, ...similarityLogs, ...textComplexityLogs],
     errorMessage: null,
     triggeredBy,
     adminId: adminId || null,

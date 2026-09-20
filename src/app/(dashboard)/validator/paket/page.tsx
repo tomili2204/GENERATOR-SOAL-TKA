@@ -199,18 +199,20 @@ export default function ValidatorPaketListPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={tipeSumberFilter}
-              onChange={(e) => {
-                setTipeSumberFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-mono text-xs cursor-pointer"
-            >
-              <option value="all">Semua Sumber (H & A)</option>
-              <option value="manual">Human (H)</option>
-              <option value="ai">AI Generated (A)</option>
-            </select>
+            {isAdmin && (
+              <select
+                value={tipeSumberFilter}
+                onChange={(e) => {
+                  setTipeSumberFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-mono text-xs cursor-pointer"
+              >
+                <option value="all">Semua Sumber (H & A)</option>
+                <option value="manual">Human (H)</option>
+                <option value="ai">AI Generated (A)</option>
+              </select>
+            )}
 
             <select
               value={jenjangFilter}
@@ -283,6 +285,7 @@ export default function ValidatorPaketListPage() {
                 actionLabel="Telaah Naskah"
                 currentUserId={currentUser?.id}
                 onAssignClick={isAdmin ? handleOpenAssign : undefined}
+                showSourceBadge={isAdmin}
               />
             ))}
           </div>

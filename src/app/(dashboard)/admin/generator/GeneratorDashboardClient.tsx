@@ -13,6 +13,7 @@ import { AiSettingsForm } from "./AiSettingsForm";
 import { FlexibleGeneratorStudio } from "./FlexibleGeneratorStudio";
 import { GeneratorToggleList } from "./GeneratorToggleList";
 import { GenerationLogsTable, GenerationLogItem } from "./GenerationLogsTable";
+import { StrictSvgToggleBanner } from "./StrictSvgToggleBanner";
 
 import { TemaKonteksPoolItem } from "@/db/schema";
 
@@ -44,6 +45,9 @@ export function GeneratorDashboardClient({
 
   return (
     <div className="space-y-6">
+      {/* Sakelar Kontrol Mode SVG Ketat (Berlaku Global untuk Manual & Cron Pagi) */}
+      <StrictSvgToggleBanner />
+
       {/* Tab Navigation */}
       <div className="flex border-b border-slate-200 bg-white rounded-t-xl px-2 pt-2 gap-1 overflow-x-auto">
         <button

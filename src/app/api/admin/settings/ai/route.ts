@@ -34,6 +34,7 @@ export async function GET() {
         modelName: config.modelName,
         temperature: config.temperature,
         customPromptPrefix: config.customPromptPrefix || "",
+        strictSvgMode: !!config.strictSvgMode,
       },
     });
   } catch (error) {
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
     await ensureTablesCreated();
 
     const body = await req.json();
-    const { apiKey, modelName, temperature, customPromptPrefix } = body;
+    const { apiKey, modelName, temperature, customPromptPrefix, strictSvgMode } = body;
 
     // Ambil setting lama jika ada
     const existing = await db
@@ -72,6 +73,7 @@ export async function POST(req: NextRequest) {
       modelName: modelName || currentVal.modelName || "gemini-3-flash-preview",
       temperature: typeof temperature === "number" ? temperature : (currentVal.temperature ?? 0.7),
       customPromptPrefix: customPromptPrefix ?? currentVal.customPromptPrefix ?? "",
+      strictSvgMode: typeof strictSvgMode === "boolean" ? strictSvgMode : (currentVal.strictSvgMode ?? false),
     };
 
     if (existing.length > 0) {

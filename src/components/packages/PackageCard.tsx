@@ -46,6 +46,7 @@ interface PackageCardProps {
   actionLabel?: string;
   currentUserId?: string;
   onAssignClick?: (pkg: any) => void;
+  showSourceBadge?: boolean;
 }
 
 export function PackageCard({
@@ -54,6 +55,7 @@ export function PackageCard({
   actionLabel = "Kelola Lembar Kerja",
   currentUserId,
   onAssignClick,
+  showSourceBadge = false,
 }: PackageCardProps) {
   const statusCfg = PACKAGE_STATUS_CONFIGS[pkg.status] || PACKAGE_STATUS_CONFIGS.draft;
   const p = pkg.progress;
@@ -68,16 +70,20 @@ export function PackageCard({
             <span className="px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-slate-900 text-white tracking-wide">
               {pkg.code}
             </span>
-            <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium ${
-                pkg.tipeSumber === "ai"
-                  ? "bg-purple-50 text-purple-700 border border-purple-200"
-                  : "bg-blue-50 text-blue-700 border border-blue-200"
-              }`}
-            >
-              {pkg.tipeSumber === "ai" ? <Sparkles className="w-3 h-3" /> : <UserCheck className="w-3 h-3" />}
-              <span>{pkg.tipeSumber === "ai" ? "AI Generated" : "Manual / Human"}</span>
-            </span>
+
+            {/* Badge Tipe Sumber (HANYA ditampilkan untuk Admin) */}
+            {showSourceBadge && (
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium ${
+                  pkg.tipeSumber === "ai"
+                    ? "bg-purple-50 text-purple-700 border border-purple-200"
+                    : "bg-blue-50 text-blue-700 border border-blue-200"
+                }`}
+              >
+                {pkg.tipeSumber === "ai" ? <Sparkles className="w-3 h-3" /> : <UserCheck className="w-3 h-3" />}
+                <span>{pkg.tipeSumber === "ai" ? "AI Generated" : "Manual / Human"}</span>
+              </span>
+            )}
 
             {/* Badge Khusus Validator jika Ditugaskan ke Dirinya */}
             {isAssignedToMe && (

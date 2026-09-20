@@ -18,6 +18,7 @@ import {
   Eye,
   Edit3,
   FileText,
+  Image as ImageIcon,
 } from "lucide-react";
 
 interface SlotQuestionModalProps {
@@ -330,6 +331,43 @@ export function SlotQuestionModal({
                   <LatexPreview content={q.payload?.soal_text || ""} />
                 </div>
               </div>
+
+              {/* Ilustrasi / Diagram Visual SVG jika ada */}
+              {q.payload?.gambar && (
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 font-mono flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-indigo-600" />
+                      Visualisasi / Diagram Pendukung
+                    </span>
+                    {q.payload.gambar.deskripsi_alt && (
+                      <span className="text-[11px] text-slate-400 font-sans normal-case italic">
+                        {q.payload.gambar.deskripsi_alt}
+                      </span>
+                    )}
+                  </label>
+                  <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 flex flex-col items-center justify-center">
+                    {q.payload.gambar.tipe === "svg" && q.payload.gambar.svg_content && (
+                      <div
+                        className="w-full max-w-xl mx-auto flex justify-center overflow-x-auto"
+                        dangerouslySetInnerHTML={{ __html: q.payload.gambar.svg_content }}
+                      />
+                    )}
+                    {q.payload.gambar.tipe === "url" && q.payload.gambar.url && (
+                      <img
+                        src={q.payload.gambar.url}
+                        alt={q.payload.gambar.deskripsi_alt || "Ilustrasi Soal"}
+                        className="max-h-64 rounded-lg object-contain border border-slate-200"
+                      />
+                    )}
+                    {q.payload.gambar.tipe === "perlu_ilustrasi" && (
+                      <span className="text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded border border-amber-200 inline-block font-mono">
+                        Catatan: Butir soal ini ditandai memerlukan pembuatan ilustrasi visual.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Opsi / Pernyataan */}
               {q.bentukSoal === "PGK_KATEGORI" ? (

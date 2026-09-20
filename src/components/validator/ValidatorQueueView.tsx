@@ -175,7 +175,7 @@ export function ValidatorQueueView({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Filter Jenjang */}
           <div>
             <label className="block text-[11px] font-medium text-slate-500 mb-1">
@@ -227,22 +227,6 @@ export function ValidatorQueueView({
             </select>
           </div>
 
-          {/* Filter Sumber (AI vs Manual diperlakukan setara) */}
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">
-              Sumber Pembuatan
-            </label>
-            <select
-              value={filterSumber}
-              onChange={(e) => setFilterSumber(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 text-xs rounded-lg px-2.5 py-1.5 focus:bg-white focus:ring-1 focus:ring-indigo-500 focus:outline-none"
-            >
-              <option value="semua">Semua Sumber (Setara)</option>
-              <option value="manual_upload">Unggahan Manual</option>
-              <option value="ai_generated">Generate Otomatis AI</option>
-            </select>
-          </div>
-
           {/* Pencarian Teks */}
           <div>
             <label className="block text-[11px] font-medium text-slate-500 mb-1">
@@ -286,7 +270,7 @@ export function ValidatorQueueView({
                   <th className="px-4 py-3">Kode & Bentuk</th>
                   <th className="px-4 py-3">Jenjang & Mapel</th>
                   <th className="px-4 py-3">Elemen / Kisi-Kisi</th>
-                  <th className="px-4 py-3">Sumber & Pengunggah</th>
+                  <th className="px-4 py-3">Pengunggah</th>
                   <th className="px-4 py-3">Pemisahan Tugas</th>
                   <th className="px-4 py-3 text-right">Aksi Telaah</th>
                 </tr>
@@ -327,24 +311,13 @@ export function ValidatorQueueView({
                         </div>
                       </td>
 
-                      {/* Sumber & Pengunggah */}
+                      {/* Pengunggah */}
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-                              item.sumber === "ai_generated"
-                                ? "bg-violet-50 text-violet-700 border-violet-200"
-                                : "bg-slate-100 text-slate-700 border-slate-200"
-                            }`}
-                          >
-                            {item.sumber === "ai_generated" ? "AI Generated" : "Manual Upload"}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-slate-700 font-medium font-sans mt-0.5">
+                        <div className="text-xs text-slate-800 font-medium font-sans">
                           {isSelf ? (
                             <strong className="text-violet-700 font-mono">Anda Sendiri</strong>
                           ) : (
-                            item.authorName || (item as any).author?.name || "–"
+                            item.authorName || (item as any).author?.name || "Tim Penulis"
                           )}
                         </div>
                       </td>

@@ -78,9 +78,6 @@ export function QuestionReviewModal({
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 font-semibold">
                   {question.bentukSoal || "PG"}
                 </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700">
-                  {question.sumber === "ai_generated" ? "AI Generated" : "Manual Upload"}
-                </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 {question.jenjang} · {question.mapel} · Elemen: <strong>{question.elemen}</strong>

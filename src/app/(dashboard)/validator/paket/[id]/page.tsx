@@ -30,6 +30,7 @@ export default function ValidatorPaketDetailPage() {
   const [error, setError] = useState("");
 
   const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Review Modal State
   const [selectedQuestion, setSelectedQuestion] = useState<any | null>(null);
@@ -52,6 +53,7 @@ export default function ValidatorPaketDetailPage() {
       if (json.data.currentUserId) {
         setCurrentUserId(json.data.currentUserId);
       }
+      setIsAdmin(!!json.data.isAdmin);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -155,16 +157,21 @@ export default function ValidatorPaketDetailPage() {
               <span className="px-3 py-1 rounded-lg text-sm font-mono font-bold bg-slate-900 text-white tracking-wide">
                 {packageData.code}
               </span>
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium ${
-                  packageData.tipeSumber === "ai"
-                    ? "bg-purple-50 text-purple-700 border border-purple-200"
-                    : "bg-blue-50 text-blue-700 border border-blue-200"
-                }`}
-              >
-                {packageData.tipeSumber === "ai" ? <Sparkles className="w-3 h-3" /> : <UserCheck className="w-3 h-3" />}
-                <span>{packageData.tipeSumber === "ai" ? "AI Generated" : "Manual / Human"}</span>
-              </span>
+
+              {/* Badge Tipe Sumber (HANYA untuk Admin) */}
+              {isAdmin && (
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium ${
+                    packageData.tipeSumber === "ai"
+                      ? "bg-purple-50 text-purple-700 border border-purple-200"
+                      : "bg-blue-50 text-blue-700 border border-blue-200"
+                  }`}
+                >
+                  {packageData.tipeSumber === "ai" ? <Sparkles className="w-3 h-3" /> : <UserCheck className="w-3 h-3" />}
+                  <span>{packageData.tipeSumber === "ai" ? "AI Generated" : "Manual / Human"}</span>
+                </span>
+              )}
+
               <span
                 className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${statusCfg.bgClass} ${statusCfg.textClass} ${statusCfg.borderClass}`}
               >

@@ -28,6 +28,7 @@ export function AiSettingsForm({ onSaved }: AiSettingsFormProps) {
   const [temperature, setTemperature] = useState(0.7);
   const [customPromptPrefix, setCustomPromptPrefix] = useState("");
   const [showKey, setShowKey] = useState(false);
+  const [strictSvgMode, setStrictSvgMode] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -50,6 +51,7 @@ export function AiSettingsForm({ onSaved }: AiSettingsFormProps) {
           if (data.data.modelName) setModelName(data.data.modelName);
           if (typeof data.data.temperature === "number") setTemperature(data.data.temperature);
           if (data.data.customPromptPrefix) setCustomPromptPrefix(data.data.customPromptPrefix);
+          if (typeof data.data.strictSvgMode === "boolean") setStrictSvgMode(data.data.strictSvgMode);
         }
       } catch (err) {
         console.error("Gagal memuat setting AI:", err);
@@ -75,6 +77,7 @@ export function AiSettingsForm({ onSaved }: AiSettingsFormProps) {
           modelName,
           temperature,
           customPromptPrefix,
+          strictSvgMode,
         }),
       });
 
@@ -330,6 +333,45 @@ export function AiSettingsForm({ onSaved }: AiSettingsFormProps) {
               <span>{isTesting ? "Sedang Menguji Koneksi..." : "🔌 Uji Koneksi API (Ping)"}</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Mode Visualisasi SVG Ketat */}
+      <div className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1 max-w-2xl">
+          <label className="text-xs font-bold font-mono text-slate-900 uppercase flex items-center gap-2">
+            <span>Mode Visualisasi SVG Ketat (Strict SVG)</span>
+            {strictSvgMode ? (
+              <span className="text-[10px] font-mono text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                AKTIF
+              </span>
+            ) : (
+              <span className="text-[10px] font-mono text-slate-600 bg-slate-200 border border-slate-300 px-2 py-0.5 rounded-full">
+                NONAKTIF (BEBAS)
+              </span>
+            )}
+          </label>
+          <p className="text-xs text-slate-600 leading-relaxed font-sans">
+            Jika diaktifkan, AI diwajibkan secara ketat menghasilkan diagram data (batang/lingkaran), denah geometri, model pecahan arsiran, dan infografik pada minimal 6–10 butir soal per paket. Berlaku baik untuk <strong>Trigger Manual</strong> maupun <strong>Jadwal Cron Otomatis Pagi</strong>.
+          </p>
+        </div>
+
+        <div className="shrink-0 flex items-center gap-3">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={strictSvgMode}
+            onClick={() => setStrictSvgMode(!strictSvgMode)}
+            className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+              strictSvgMode ? "bg-emerald-600" : "bg-slate-300"
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out flex items-center justify-center ${
+                strictSvgMode ? "translate-x-7" : "translate-x-0"
+              }`}
+            />
+          </button>
         </div>
       </div>
 
