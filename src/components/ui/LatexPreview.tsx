@@ -33,6 +33,21 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className =
         return placeholder;
       });
 
+      // 1b. Ekstrak gambar bertanda Markdown ![alt](url) sebelum proses teks lain (mis. impor Excel
+      // yang menyisipkan gambar langsung di dalam teks soal/opsi, bukan lewat field "gambar" terpisah).
+      const imgPlaceholders: string[] = [];
+      text = text.replace(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g, (_match, alt, url) => {
+        const placeholder = `___IMG_BLOCK_${imgPlaceholders.length}___`;
+        const safeAlt = String(alt || "Ilustrasi").replace(/"/g, "&quot;");
+        imgPlaceholders.push(
+          `<img src="${url}" alt="${safeAlt}" class="max-w-full max-h-72 mx-auto my-2 rounded-lg border border-slate-200 object-contain block" />`
+        );
+        return placeholder;
+      });
+
+      // 1c. Buang tag BBCode sisa dari sumber lain (mis. [center]...[/center]) yang tidak didukung di sini
+      text = text.replace(/\[\/?(?:center|b|i|u)\]/gi, "");
+
       // 2. Ganti escaped dollar lebih dulu
       text = text.replace(/\\(\$)/g, "___ESCAPED_DOLLAR___");
 
@@ -177,6 +192,7 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className =
             l.startsWith("<table") ||
             l.startsWith("<hr") ||
             l.startsWith("___SVG_BLOCK_") ||
+            l.startsWith("___IMG_BLOCK_") ||
             l.startsWith("___KATEX_DISPLAY_")
           ) {
             return l;
@@ -196,6 +212,10 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className =
 
       svgPlaceholders.forEach((svgHtml, idx) => {
         result = result.replace(new RegExp(`___SVG_BLOCK_${idx}___`, "g"), () => svgHtml);
+      });
+
+      imgPlaceholders.forEach((imgHtml, idx) => {
+        result = result.replace(new RegExp(`___IMG_BLOCK_${idx}___`, "g"), () => imgHtml);
       });
 
       return result;

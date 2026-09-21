@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PackageSlotGrid, SlotData } from "@/components/packages/PackageSlotGrid";
 import { SlotQuestionModal } from "@/components/packages/SlotQuestionModal";
+import { ExcelImportPanel } from "@/components/pembuat/ExcelImportPanel";
 import { PACKAGE_STATUS_CONFIGS } from "@/lib/tokens";
 import {
   ArrowLeft,
@@ -17,6 +18,7 @@ import {
   Layers,
   Sparkles,
   Info,
+  FileSpreadsheet,
 } from "lucide-react";
 
 export default function PembuatPaketDetailPage() {
@@ -32,6 +34,7 @@ export default function PembuatPaketDetailPage() {
   // Modal State
   const [selectedSlot, setSelectedSlot] = useState<SlotData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   // Publish State
   const [isPublishing, setIsPublishing] = useState(false);
@@ -240,13 +243,30 @@ export default function PembuatPaketDetailPage() {
             <Layers className="w-4 h-4 text-indigo-600" />
             <span>Lembar Kerja 30 Slot Naskah</span>
           </h2>
-          <span className="text-xs text-slate-400 font-mono">
-            Klik pada salah satu slot untuk melihat atau mengisi naskah soal.
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-400 font-mono hidden sm:inline">
+              Klik pada salah satu slot untuk melihat atau mengisi naskah soal.
+            </span>
+            <button
+              onClick={() => setIsImportOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shrink-0"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Impor dari Excel</span>
+            </button>
+          </div>
         </div>
 
         <PackageSlotGrid slots={slots} onSelectSlot={handleSlotClick} isValidator={false} />
       </div>
+
+      {/* Modal Impor Massal dari Excel */}
+      <ExcelImportPanel
+        packageId={packageId}
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onSuccess={() => loadPackageDetails()}
+      />
 
       {/* Modal View / Edit / Replace Slot */}
       {selectedSlot && (
