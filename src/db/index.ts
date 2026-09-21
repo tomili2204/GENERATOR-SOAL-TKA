@@ -43,6 +43,12 @@ export function getDb() {
         max: 5,
         connectionTimeoutMillis: 10000,
       });
+      // Koneksi idle ke Supabase pooler sesekali diputus paksa oleh server (ECONNRESET).
+      // Tanpa listener ini, error tersebut jadi unhandled 'error' event dan mem-crash
+      // seluruh proses Node — bukan hanya query yang sedang berjalan.
+      globalForDb.pgPool.on("error", (err) => {
+        console.warn("[DB Pool] Koneksi idle terputus, akan dibuat ulang otomatis:", err.message);
+      });
     }
     globalForDb.dbInstance = drizzlePg(globalForDb.pgPool, { schema });
     return globalForDb.dbInstance;
@@ -104,6 +110,9 @@ export async function ensureTablesCreated() {
             ssl: { rejectUnauthorized: false },
             max: 10,
             connectionTimeoutMillis: 10000,
+          });
+          globalForDb.pgPool.on("error", (err) => {
+            console.warn("[DB Pool] Koneksi idle terputus, akan dibuat ulang otomatis:", err.message);
           });
           globalForDb.pgPool.on("connect", (client) => {
             client.query("SET search_path TO soal, public;");
@@ -330,6 +339,9 @@ export async function ensureTablesCreated() {
         ssl: { rejectUnauthorized: false },
         max: 10,
         connectionTimeoutMillis: 10000,
+      });
+      globalForDb.pgPool.on("error", (err) => {
+        console.warn("[DB Pool] Koneksi idle terputus, akan dibuat ulang otomatis:", err.message);
       });
       globalForDb.pgPool.on("connect", (client) => {
         client.query("SET search_path TO soal, public;");
