@@ -17,7 +17,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { LatexPreview } from "@/components/ui/LatexPreview";
-import { SvgIllustration } from "@/components/ui/SvgIllustration";
+import { GambarIllustration } from "@/components/ui/GambarIllustration";
 import { ValidatorNoteText } from "@/components/ui/ValidatorNoteText";
 import { RevisionComparisonPanel } from "./RevisionComparisonPanel";
 
@@ -205,24 +205,7 @@ export function QuestionReviewModal({
                 Ilustrasi / Gambar Pendukung:
               </span>
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
-                {payload.gambar.tipe === "url" && payload.gambar.url && (
-                  <img
-                    src={payload.gambar.url}
-                    alt={payload.gambar.deskripsi_alt || "Gambar Soal"}
-                    className="max-h-48 mx-auto rounded object-contain border border-slate-200"
-                  />
-                )}
-                {payload.gambar.tipe === "svg" && payload.gambar.svg_content && (
-                  <SvgIllustration
-                    svgContent={payload.gambar.svg_content}
-                    altText={payload.gambar.deskripsi_alt}
-                  />
-                )}
-                {payload.gambar.tipe === "perlu_ilustrasi" && (
-                  <span className="text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded border border-amber-200 inline-block font-mono">
-                    Catatan: Butir soal ini ditandai memerlukan pembuatan ilustrasi visual.
-                  </span>
-                )}
+                <GambarIllustration gambar={payload.gambar} />
               </div>
             </div>
           )}

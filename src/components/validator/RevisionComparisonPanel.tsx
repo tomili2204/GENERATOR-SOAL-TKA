@@ -3,7 +3,7 @@
 import React from "react";
 import { GitCompare } from "lucide-react";
 import { LatexPreview } from "@/components/ui/LatexPreview";
-import { SvgIllustration } from "@/components/ui/SvgIllustration";
+import { GambarIllustration } from "@/components/ui/GambarIllustration";
 
 interface PayloadShape {
   soal_text?: string;
@@ -27,19 +27,10 @@ function isEqualField(a: any, b: any): boolean {
 
 function GambarPreview({ gambar }: { gambar: any }) {
   if (!gambar) return <span className="text-slate-400 italic">Tidak ada ilustrasi</span>;
-  if (gambar.tipe === "svg" && gambar.svg_content) {
-    return <SvgIllustration svgContent={gambar.svg_content} altText={gambar.deskripsi_alt} />;
+  if (gambar.tipe === "perlu_ilustrasi") {
+    return <span className="text-amber-600 italic">Ditandai perlu ilustrasi</span>;
   }
-  if (gambar.tipe === "url" && gambar.url) {
-    return (
-      <img
-        src={gambar.url}
-        alt={gambar.deskripsi_alt || "Ilustrasi"}
-        className="max-h-40 mx-auto rounded object-contain"
-      />
-    );
-  }
-  return <span className="text-amber-600 italic">Ditandai perlu ilustrasi</span>;
+  return <GambarIllustration gambar={gambar} className="max-h-40" />;
 }
 
 function OpsiList({ opsi, kunci }: { opsi: Array<{ label: string; text: string }>; kunci: string[] }) {

@@ -1,9 +1,29 @@
 "use client";
 
 import React, { useState } from "react";
-import { CheckCircle2, AlertTriangle, XCircle, Clock, RefreshCw, ChevronDown, ChevronUp, Package, ShieldCheck, Sparkles } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, Clock, RefreshCw, ChevronDown, ChevronUp, Package, ShieldCheck, Sparkles, Camera } from "lucide-react";
 import Link from "next/link";
 import { TablePagination } from "@/components/ui/TablePagination";
+
+const NANO_BANANA_MARKER = "__NANO_BANANA_STATS__";
+
+interface NanoBananaStats {
+  converted: number;
+  fallback: number;
+  fallbackReasons: Record<string, number>;
+}
+
+function parseNanoBananaStats(
+  detailPemeriksaan: Array<{ index: number; reason: string; itemTitle?: string }> | null
+): NanoBananaStats | null {
+  const entry = detailPemeriksaan?.find((f) => f.itemTitle === NANO_BANANA_MARKER);
+  if (!entry) return null;
+  try {
+    return JSON.parse(entry.reason);
+  } catch {
+    return null;
+  }
+}
 
 function formatDate(d: Date | string) {
   try {
@@ -125,7 +145,9 @@ export function GenerationLogsTable({
             <tbody className="divide-y divide-slate-100 bg-white">
               {paginatedLogs.map((log) => {
                 const isExpanded = expandedId === log.id;
-                const hasFailedItems = log.detailPemeriksaan && log.detailPemeriksaan.length > 0;
+                const nanoBananaStats = parseNanoBananaStats(log.detailPemeriksaan);
+                const rejectedItems = (log.detailPemeriksaan || []).filter((f) => f.itemTitle !== NANO_BANANA_MARKER);
+                const hasFailedItems = rejectedItems.length > 0;
                 const startDate = new Date(log.startedAt);
 
                 return (
@@ -186,6 +208,15 @@ export function GenerationLogsTable({
                         <span className="text-slate-400 text-[10px] ml-1">
                           (target {log.totalDiminta})
                         </span>
+                        {nanoBananaStats && (nanoBananaStats.converted > 0 || nanoBananaStats.fallback > 0) && (
+                          <span
+                            className="inline-flex items-center gap-1 ml-2 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-semibold"
+                            title={`Nano Banana: ${nanoBananaStats.converted} dikonversi ke ilustrasi kontekstual, ${nanoBananaStats.fallback} fallback ke SVG`}
+                          >
+                            <Camera className="w-3 h-3" />
+                            {nanoBananaStats.converted}/{nanoBananaStats.fallback}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {log.packageId ? (
@@ -263,14 +294,43 @@ export function GenerationLogsTable({
                               </div>
                             )}
 
+                            {nanoBananaStats && (nanoBananaStats.converted > 0 || nanoBananaStats.fallback > 0) && (
+                              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg text-xs font-sans space-y-1.5">
+                                <span className="font-bold text-slate-800 flex items-center gap-1.5 font-mono">
+                                  <Camera className="w-3.5 h-3.5 text-amber-600" />
+                                  Konversi Ilustrasi Kontekstual Nano Banana Pro
+                                </span>
+                                <p className="text-slate-700">
+                                  <strong className="text-emerald-700">{nanoBananaStats.converted} butir</strong> berhasil
+                                  dikonversi menjadi ilustrasi kontekstual,{" "}
+                                  <strong className={nanoBananaStats.fallback > 0 ? "text-orange-700" : "text-slate-500"}>
+                                    {nanoBananaStats.fallback} butir
+                                  </strong>{" "}
+                                  fallback ke SVG standar.
+                                </p>
+                                {nanoBananaStats.fallback > 0 && Object.keys(nanoBananaStats.fallbackReasons).length > 0 && (
+                                  <div className="flex flex-wrap gap-1.5 pt-1">
+                                    {Object.entries(nanoBananaStats.fallbackReasons).map(([reason, count]) => (
+                                      <span
+                                        key={reason}
+                                        className="px-2 py-0.5 rounded-md text-[11px] border border-orange-300 bg-orange-50 text-orange-800 font-mono"
+                                      >
+                                        {reason}: <strong>{count}</strong>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
                             {hasFailedItems && (
                               <div>
                                 <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                   <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                                  Daftar Butir yang Ditolak oleh Gerbang Sanitasi Otomatis ({log.detailPemeriksaan?.length} butir):
+                                  Daftar Butir yang Ditolak oleh Gerbang Sanitasi Otomatis ({rejectedItems.length} butir):
                                 </h4>
                                 <div className="space-y-2 max-h-56 overflow-y-auto pr-2">
-                                  {log.detailPemeriksaan?.map((f, i) => (
+                                  {rejectedItems.map((f, i) => (
                                     <div
                                       key={i}
                                       className="p-2.5 bg-white border border-amber-200 rounded-lg text-xs"

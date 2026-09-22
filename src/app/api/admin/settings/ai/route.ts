@@ -35,6 +35,7 @@ export async function GET() {
         temperature: config.temperature,
         customPromptPrefix: config.customPromptPrefix || "",
         strictSvgMode: !!config.strictSvgMode,
+        nanoBananaEnabled: !!config.nanoBananaEnabled,
       },
     });
   } catch (error) {
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
     await ensureTablesCreated();
 
     const body = await req.json();
-    const { apiKey, modelName, temperature, customPromptPrefix, strictSvgMode } = body;
+    const { apiKey, modelName, temperature, customPromptPrefix, strictSvgMode, nanoBananaEnabled } = body;
 
     // Ambil setting lama jika ada
     const existing = await db
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
       temperature: typeof temperature === "number" ? temperature : (currentVal.temperature ?? 0.7),
       customPromptPrefix: customPromptPrefix ?? currentVal.customPromptPrefix ?? "",
       strictSvgMode: typeof strictSvgMode === "boolean" ? strictSvgMode : (currentVal.strictSvgMode ?? false),
+      nanoBananaEnabled: typeof nanoBananaEnabled === "boolean" ? nanoBananaEnabled : (currentVal.nanoBananaEnabled ?? false),
     };
 
     if (existing.length > 0) {

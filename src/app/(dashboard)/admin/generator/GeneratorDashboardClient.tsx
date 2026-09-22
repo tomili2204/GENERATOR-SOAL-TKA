@@ -14,6 +14,7 @@ import { FlexibleGeneratorStudio } from "./FlexibleGeneratorStudio";
 import { GeneratorToggleList } from "./GeneratorToggleList";
 import { GenerationLogsTable, GenerationLogItem } from "./GenerationLogsTable";
 import { StrictSvgToggleBanner } from "./StrictSvgToggleBanner";
+import { NanoBananaToggleBanner } from "./NanoBananaToggleBanner";
 
 import { TemaKonteksPoolItem } from "@/db/schema";
 
@@ -45,8 +46,11 @@ export function GeneratorDashboardClient({
 
   return (
     <div className="space-y-6">
-      {/* Sakelar Kontrol Mode SVG Ketat (Berlaku Global untuk Manual & Cron Pagi) */}
-      <StrictSvgToggleBanner />
+      {/* Sakelar Kontrol Mode SVG Ketat & Ilustrasi Kontekstual Nano Banana (Berlaku Global untuk Manual & Cron Pagi) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <StrictSvgToggleBanner />
+        <NanoBananaToggleBanner />
+      </div>
 
       {/* Tab Navigation */}
       <div className="flex border-b border-slate-200 bg-white rounded-t-xl px-2 pt-2 gap-1 overflow-x-auto">

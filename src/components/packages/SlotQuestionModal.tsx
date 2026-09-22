@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { LatexPreview } from "@/components/ui/LatexPreview";
 import { SvgIllustration } from "@/components/ui/SvgIllustration";
+import { GambarIllustration } from "@/components/ui/GambarIllustration";
 import { ValidatorNoteText } from "@/components/ui/ValidatorNoteText";
 import { validateLatexDelimiters } from "@/lib/validations/latex";
 import { StimulusSelector } from "@/components/pembuat/StimulusSelector";
@@ -420,24 +421,7 @@ export function SlotQuestionModal({
                     )}
                   </label>
                   <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 flex flex-col items-center justify-center">
-                    {q.payload.gambar.tipe === "svg" && q.payload.gambar.svg_content && (
-                      <SvgIllustration
-                        svgContent={q.payload.gambar.svg_content}
-                        altText={q.payload.gambar.deskripsi_alt}
-                      />
-                    )}
-                    {q.payload.gambar.tipe === "url" && q.payload.gambar.url && (
-                      <img
-                        src={q.payload.gambar.url}
-                        alt={q.payload.gambar.deskripsi_alt || "Ilustrasi Soal"}
-                        className="max-h-64 rounded-lg object-contain border border-slate-200"
-                      />
-                    )}
-                    {q.payload.gambar.tipe === "perlu_ilustrasi" && (
-                      <span className="text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded border border-amber-200 inline-block font-mono">
-                        Catatan: Butir soal ini ditandai memerlukan pembuatan ilustrasi visual.
-                      </span>
-                    )}
+                    <GambarIllustration gambar={q.payload.gambar} />
                   </div>
                 </div>
               )}

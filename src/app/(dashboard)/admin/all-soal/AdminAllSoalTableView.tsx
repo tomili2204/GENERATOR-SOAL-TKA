@@ -6,7 +6,7 @@ import { Question } from "@/db/schema";
 import { StatusBadge } from "@/components/ui/Badge";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { LatexPreview } from "@/components/ui/LatexPreview";
-import { SvgIllustration } from "@/components/ui/SvgIllustration";
+import { GambarIllustration } from "@/components/ui/GambarIllustration";
 import { ValidatorNoteText } from "@/components/ui/ValidatorNoteText";
 import { isJenjangMatch } from "@/lib/jenjang-utils";
 import {
@@ -608,16 +608,13 @@ export function AdminAllSoalTableView({
                     </div>
                   </div>
 
-                  {/* Diagram SVG jika ada */}
-                  {selectedQuestion.payload?.gambar?.tipe === "svg" && selectedQuestion.payload.gambar.svg_content && (
+                  {/* Ilustrasi / Diagram Visual jika ada (SVG, ilustrasi kontekstual Nano Banana, dsb) */}
+                  {selectedQuestion.payload?.gambar && (
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center">
                       <span className="text-[11px] font-bold font-mono uppercase tracking-wider text-slate-500 mb-2">
                         Diagram Geometri / Visual
                       </span>
-                      <SvgIllustration
-                        svgContent={selectedQuestion.payload.gambar.svg_content}
-                        altText={selectedQuestion.payload.gambar.deskripsi_alt}
-                      />
+                      <GambarIllustration gambar={selectedQuestion.payload.gambar} />
                     </div>
                   )}
 

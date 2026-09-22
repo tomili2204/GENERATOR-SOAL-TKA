@@ -151,6 +151,7 @@ export interface StoredAiConfig {
   temperature: number;
   customPromptPrefix?: string;
   strictSvgMode?: boolean;
+  nanoBananaEnabled?: boolean;
 }
 
 /**
@@ -174,6 +175,7 @@ export async function getStoredAiConfig(): Promise<StoredAiConfig> {
         temperature: typeof val.temperature === "number" ? val.temperature : 0.7,
         customPromptPrefix: val.customPromptPrefix || "",
         strictSvgMode: !!val.strictSvgMode,
+        nanoBananaEnabled: !!val.nanoBananaEnabled,
       };
     }
   } catch (err) {
@@ -185,6 +187,7 @@ export async function getStoredAiConfig(): Promise<StoredAiConfig> {
     modelName: process.env.GEMINI_MODEL || "gemini-3-flash-preview",
     temperature: 0.7,
     strictSvgMode: false,
+    nanoBananaEnabled: false,
   };
 }
 
@@ -275,6 +278,107 @@ export async function callGeminiResilient(options: {
   }
 
   throw new Error(`Semua varian model Gemini sedang mengalami kendala: ${errors.slice(-3).join("; ")}`);
+}
+
+// Kandidat model gambar "Nano Banana Pro" (nama tampilan resmi Google untuk keluarga model
+// gemini-*-pro-image). Beberapa id sengaja disiapkan sebagai fallback karena id model preview
+// Google kerap berganti; urutan mencerminkan prioritas kualitas/stabilitas.
+const NANO_BANANA_PRO_MODELS = ["gemini-3-pro-image-preview", "gemini-3-pro-image", "nano-banana-pro-preview"];
+
+export type NanoBananaErrorCode =
+  | "model_unauthorized"
+  | "model_not_found"
+  | "quota_exceeded"
+  | "timeout"
+  | "no_image_returned"
+  | "unknown_error";
+
+export interface NanoBananaResult {
+  success: boolean;
+  dataUri?: string;
+  usedModel?: string;
+  errorCode?: NanoBananaErrorCode;
+  errorMessage?: string;
+}
+
+/**
+ * Memanggil model gambar Nano Banana Pro (keluarga Gemini image) untuk menghasilkan satu
+ * ilustrasi kontekstual. Mencoba setiap model kandidat maksimal 2x sebelum menyerah ke
+ * kandidat berikutnya, agar kegagalan satu model/preview tidak langsung menggagalkan seluruh
+ * proses generate paket (pemanggil WAJIB fallback ke SVG asli bila fungsi ini mengembalikan
+ * success: false).
+ */
+export async function callNanoBananaImage(apiKey: string, prompt: string): Promise<NanoBananaResult> {
+  const errors: string[] = [];
+  let lastErrorCode: NanoBananaErrorCode = "unknown_error";
+
+  for (const model of NANO_BANANA_PRO_MODELS) {
+    let shouldTryNextModel = false;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+          }),
+          signal: AbortSignal.timeout(60000),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          let code: NanoBananaErrorCode = "unknown_error";
+          if (res.status === 401 || res.status === 403) code = "model_unauthorized";
+          else if (res.status === 404) code = "model_not_found";
+          else if (res.status === 429) code = "quota_exceeded";
+
+          lastErrorCode = code;
+          errors.push(`${model} (percobaan ${attempt}): HTTP ${res.status} - ${errText.slice(0, 200)}`);
+
+          if (code === "model_unauthorized" || code === "model_not_found") {
+            shouldTryNextModel = true;
+            break; // model ini memang tidak bisa dipakai, langsung coba kandidat berikutnya
+          }
+          if (code === "quota_exceeded" && attempt < 2) {
+            await new Promise((r) => setTimeout(r, 2000));
+            continue;
+          }
+          continue;
+        }
+
+        const json = await res.json();
+        const parts = json.candidates?.[0]?.content?.parts || [];
+        const imagePart = parts.find((p: any) => p?.inlineData?.data);
+
+        if (!imagePart) {
+          lastErrorCode = "no_image_returned";
+          errors.push(`${model} (percobaan ${attempt}): respons tidak mengandung data gambar.`);
+          continue;
+        }
+
+        const mimeType = imagePart.inlineData.mimeType || "image/png";
+        return {
+          success: true,
+          dataUri: `data:${mimeType};base64,${imagePart.inlineData.data}`,
+          usedModel: model,
+        };
+      } catch (err: any) {
+        const isTimeout = err?.name === "TimeoutError" || err?.name === "AbortError";
+        lastErrorCode = isTimeout ? "timeout" : "unknown_error";
+        errors.push(`${model} (percobaan ${attempt}): ${isTimeout ? "timeout" : err.message}`);
+      }
+    }
+
+    if (shouldTryNextModel) continue;
+  }
+
+  return {
+    success: false,
+    errorCode: lastErrorCode,
+    errorMessage: errors.slice(-3).join("; "),
+  };
 }
 
 /**
@@ -692,6 +796,8 @@ export interface GenerationResult {
   detailPemeriksaan: Array<{ index: number; reason: string; itemTitle?: string }>;
   errorMessage?: string;
   durationMs: number;
+  nanoBananaConverted?: number;
+  nanoBananaFallback?: number;
 }
 
 /**
@@ -1591,6 +1697,58 @@ ${curriculumGuidance}`;
     updatedAt: new Date(),
   });
 
+  // 7B. Konversi Ilustrasi Kontekstual Nano Banana Pro (opsional, hanya utk gambar.tipe === "svg")
+  // Berlaku sama untuk Trigger Manual maupun Jadwal Cron Otomatis Pagi karena beroperasi di sini,
+  // setelah seluruh soal lolos gerbang validasi dan SEBELUM disimpan ke database.
+  let nanoBananaConverted = 0;
+  let nanoBananaFallback = 0;
+  const nanoBananaFallbackReasons: Record<string, number> = {};
+
+  if (storedConfig.nanoBananaEnabled && apiKey.trim()) {
+    for (const vq of validQuestions) {
+      if (!vq.gambar || vq.gambar.tipe !== "svg") continue; // diagram_batang/lingkaran/pecahan/garis bilangan TIDAK disentuh
+
+      const deskripsiAlt = vq.gambar.deskripsi_alt || vq.soal_text?.slice(0, 120) || "Ilustrasi soal";
+      const imagePrompt = `Konteks soal TKA (${jenjang} - ${mapel}): ${vq.soal_text}\n\nDeskripsi ilustrasi yang dibutuhkan: ${deskripsiAlt}\n\nGambarkan HANYA skenario/pemandangan nyata yang dideskripsikan. DILARANG KERAS menambahkan garis bantu geometri, label sudut, label ukuran/angka, notasi matematika, panah pengukuran, atau anotasi teknis apa pun pada gambar. Gambar harus berupa ilustrasi/foto adegan natural, bukan diagram.`;
+
+      const result = await callNanoBananaImage(apiKey, imagePrompt);
+
+      if (result.success && result.dataUri) {
+        const svgFallback = vq.gambar.svg_content;
+        vq.gambar = {
+          tipe: "ilustrasi_kontekstual",
+          image_data: result.dataUri,
+          deskripsi_alt: deskripsiAlt,
+          svg_fallback: svgFallback,
+        };
+        nanoBananaConverted++;
+      } else {
+        // Fallback: biarkan gambar.tipe tetap "svg" apa adanya, JANGAN gagalkan proses generate paket.
+        nanoBananaFallback++;
+        const code = result.errorCode || "unknown_error";
+        nanoBananaFallbackReasons[code] = (nanoBananaFallbackReasons[code] || 0) + 1;
+        console.warn(
+          `[Nano Banana] Gagal konversi ilustrasi untuk soal "${vq.soal_text?.slice(0, 60)}...": ${code} - ${result.errorMessage}`
+        );
+      }
+    }
+  }
+
+  const nanoBananaLogs: Array<{ index: number; reason: string; itemTitle?: string }> =
+    nanoBananaConverted > 0 || nanoBananaFallback > 0
+      ? [
+          {
+            index: 0,
+            itemTitle: "__NANO_BANANA_STATS__",
+            reason: JSON.stringify({
+              converted: nanoBananaConverted,
+              fallback: nanoBananaFallback,
+              fallbackReasons: nanoBananaFallbackReasons,
+            }),
+          },
+        ]
+      : [];
+
   // 8. Simpan Seluruh Butir Soal Valid ke Database
   for (let i = 0; i < validQuestions.length; i++) {
     const vq = validQuestions[i];
@@ -1661,7 +1819,7 @@ ${curriculumGuidance}`;
     totalDiterima: questionObjects.length,
     totalLolos: validQuestions.length,
     totalGagal: failedItems.length,
-    detailPemeriksaan: [...failedItems, ...themeWarnings, ...similarityLogs, ...textComplexityLogs],
+    detailPemeriksaan: [...failedItems, ...themeWarnings, ...similarityLogs, ...textComplexityLogs, ...nanoBananaLogs],
     errorMessage: null,
     triggeredBy,
     adminId: adminId || null,
@@ -1700,6 +1858,8 @@ ${curriculumGuidance}`;
     totalGagal: failedItems.length,
     detailPemeriksaan: failedItems,
     durationMs: completedAt.getTime() - startedAt.getTime(),
+    nanoBananaConverted,
+    nanoBananaFallback,
   };
 }
 
