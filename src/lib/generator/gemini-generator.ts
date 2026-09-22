@@ -1209,6 +1209,13 @@ ${formatArchetypeGuidancePrompt(deterministicSlotPlans.slice(chunk1Count), jenja
 
   // 5. Jalankan Gerbang Pemeriksaan Ketat pada Tiap Butir Soal
   const validQuestions: any[] = [];
+  // Menandai objek "gambar" yang berasal dari template diagram presisi (diagram_batang/lingkaran/
+  // model_pecahan/garis_bilangan) SETELAH diterjemahkan jadi svg_content oleh D3 di bawah. WeakSet
+  // dipilih (bukan properti biasa di objek gambar) supaya tidak ikut tersimpan ke payload database,
+  // dan tetap valid walau objek soal induknya di-shallow-copy (mis. {...q, realStimulusId}) karena
+  // referensi objek "gambar" itu sendiri tidak berubah. Dipakai nanti oleh gerbang Nano Banana Pro
+  // agar diagram data presisi TIDAK PERNAH ikut dikonversi jadi ilustrasi kontekstual.
+  const diagramOriginGambar = new WeakSet<object>();
 
   questionObjects.forEach((q, idx) => {
     const itemNum = idx + 1;
@@ -1328,7 +1335,9 @@ ${formatArchetypeGuidancePrompt(deterministicSlotPlans.slice(chunk1Count), jenja
       if (!diagramResult.svg) {
         reasons.push(`Spesifikasi template diagram tidak valid: ${diagramResult.error}`);
       } else {
-        q.gambar = { tipe: "svg", svg_content: diagramResult.svg, deskripsi_alt: q.gambar.deskripsi_alt || "" };
+        const renderedGambar = { tipe: "svg", svg_content: diagramResult.svg, deskripsi_alt: q.gambar.deskripsi_alt || "" };
+        diagramOriginGambar.add(renderedGambar);
+        q.gambar = renderedGambar;
       }
     }
 
@@ -1542,7 +1551,9 @@ ${curriculumGuidance}`;
         if (!diagramResult.svg) {
           qReasons.push(`Spesifikasi template diagram tidak valid: ${diagramResult.error}`);
         } else {
-          q.gambar = { tipe: "svg", svg_content: diagramResult.svg, deskripsi_alt: q.gambar.deskripsi_alt || "" };
+          const renderedGambar = { tipe: "svg", svg_content: diagramResult.svg, deskripsi_alt: q.gambar.deskripsi_alt || "" };
+          diagramOriginGambar.add(renderedGambar);
+          q.gambar = renderedGambar;
         }
       }
 
@@ -1706,7 +1717,12 @@ ${curriculumGuidance}`;
 
   if (storedConfig.nanoBananaEnabled && apiKey.trim()) {
     for (const vq of validQuestions) {
-      if (!vq.gambar || vq.gambar.tipe !== "svg") continue; // diagram_batang/lingkaran/pecahan/garis bilangan TIDAK disentuh
+      if (!vq.gambar || vq.gambar.tipe !== "svg") continue;
+      // PENTING: diagram_batang/lingkaran/model_pecahan/garis_bilangan SUDAH diterjemahkan jadi
+      // tipe "svg" oleh D3 di atas, sehingga tidak lagi bisa dibedakan dari SVG bebas hanya lewat
+      // field "tipe". diagramOriginGambar (WeakSet) yang membedakannya -- TANPA cek ini, diagram
+      // data presisi akan ikut salah dikonversi jadi foto (bug nyata yang pernah terjadi).
+      if (diagramOriginGambar.has(vq.gambar)) continue;
 
       const deskripsiAlt = vq.gambar.deskripsi_alt || vq.soal_text?.slice(0, 120) || "Ilustrasi soal";
       const imagePrompt = `Konteks soal TKA (${jenjang} - ${mapel}): ${vq.soal_text}\n\nDeskripsi ilustrasi yang dibutuhkan: ${deskripsiAlt}\n\nGambarkan HANYA skenario/pemandangan nyata yang dideskripsikan. DILARANG KERAS menambahkan garis bantu geometri, label sudut, label ukuran/angka, notasi matematika, panah pengukuran, atau anotasi teknis apa pun pada gambar. Gambar harus berupa ilustrasi/foto adegan natural, bukan diagram.`;
