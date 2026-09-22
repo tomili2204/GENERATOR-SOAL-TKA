@@ -107,13 +107,19 @@ function renderDiagramBatang(spec: any): DiagramRenderResult {
   const left = 55;
   const right = 20;
   const top = spec.judul ? 46 : 24;
-  const bottom = 56;
   const plotW = W - left - right;
-  const plotH = H - top - bottom;
   const niceMax = niceCeil(Math.max(...nilai, 0) || 1);
   const n = kategori.length;
   const slot = plotW / n;
   const barW = slot * 0.55;
+
+  // Label kategori panjang akan bertumpuk jika dipaksa horizontal dalam slot sempit;
+  // deteksi lewat estimasi lebar teks dan miringkan label bila tidak muat.
+  const CHAR_WIDTH_ESTIMATE = 11 * 0.55; // perkiraan lebar rata-rata karakter pada font-size 11
+  const maxLabelWidth = Math.max(...kategori.map((k: string) => String(k).length * CHAR_WIDTH_ESTIMATE));
+  const needsRotation = maxLabelWidth > slot * 0.92;
+  const bottom = needsRotation ? 92 : 56;
+  const plotH = H - top - bottom;
 
   const gridLines: string[] = [];
   const yLabels: string[] = [];
@@ -138,9 +144,17 @@ function renderDiagramBatang(spec: any): DiagramRenderResult {
     valueLabels.push(
       `<text x="${(x + barW / 2).toFixed(1)}" y="${(y - 6).toFixed(1)}" font-size="11" text-anchor="middle" fill="${INK}" font-weight="600" font-family="${FONT}">${val}</text>`
     );
-    xLabels.push(
-      `<text x="${(x + barW / 2).toFixed(1)}" y="${(top + plotH + 18).toFixed(1)}" font-size="11" text-anchor="middle" fill="${INK}" font-family="${FONT}">${escXml(kategori[i])}</text>`
-    );
+    const labelCx = (x + barW / 2).toFixed(1);
+    if (needsRotation) {
+      const labelY = (top + plotH + 14).toFixed(1);
+      xLabels.push(
+        `<text x="${labelCx}" y="${labelY}" font-size="10.5" text-anchor="end" fill="${INK}" font-family="${FONT}" transform="rotate(-35 ${labelCx} ${labelY})">${escXml(kategori[i])}</text>`
+      );
+    } else {
+      xLabels.push(
+        `<text x="${labelCx}" y="${(top + plotH + 18).toFixed(1)}" font-size="11" text-anchor="middle" fill="${INK}" font-family="${FONT}">${escXml(kategori[i])}</text>`
+      );
+    }
   });
 
   const titleSvg = spec.judul
