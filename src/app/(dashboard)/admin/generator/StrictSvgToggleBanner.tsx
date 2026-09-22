@@ -68,7 +68,7 @@ export function StrictSvgToggleBanner({ onToggleChanged }: StrictSvgToggleBanner
     <div
       className={`rounded-2xl border p-4 sm:p-5 transition-all duration-300 shadow-sm ${
         isStrict
-          ? "bg-gradient-to-r from-emerald-950/20 via-slate-900/40 to-indigo-950/30 border-emerald-500/40"
+          ? "bg-emerald-50 border-emerald-300"
           : "bg-white border-slate-200"
       }`}
     >
@@ -78,7 +78,7 @@ export function StrictSvgToggleBanner({ onToggleChanged }: StrictSvgToggleBanner
           <div className="flex items-center gap-2">
             <div
               className={`p-1.5 rounded-lg ${
-                isStrict ? "bg-emerald-500/20 text-emerald-400" : "bg-indigo-50 text-indigo-600"
+                isStrict ? "bg-emerald-100 text-emerald-600" : "bg-indigo-50 text-indigo-600"
               }`}
             >
               <ImageIcon className="w-4 h-4" />

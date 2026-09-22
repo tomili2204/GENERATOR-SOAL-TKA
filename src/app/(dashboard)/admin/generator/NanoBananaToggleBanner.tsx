@@ -68,7 +68,7 @@ export function NanoBananaToggleBanner({ onToggleChanged }: NanoBananaToggleBann
     <div
       className={`rounded-2xl border p-4 sm:p-5 transition-all duration-300 shadow-sm ${
         isNanoBanana
-          ? "bg-gradient-to-r from-amber-950/20 via-slate-900/40 to-orange-950/30 border-amber-500/40"
+          ? "bg-amber-50 border-amber-300"
           : "bg-white border-slate-200"
       }`}
     >
@@ -78,7 +78,7 @@ export function NanoBananaToggleBanner({ onToggleChanged }: NanoBananaToggleBann
           <div className="flex items-center gap-2">
             <div
               className={`p-1.5 rounded-lg ${
-                isNanoBanana ? "bg-amber-500/20 text-amber-400" : "bg-indigo-50 text-indigo-600"
+                isNanoBanana ? "bg-amber-100 text-amber-600" : "bg-indigo-50 text-indigo-600"
               }`}
             >
               <Camera className="w-4 h-4" />
