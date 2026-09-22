@@ -41,8 +41,15 @@ export function ExcelImportPanel({ packageId, isOpen, onClose, onSuccess }: Exce
   };
 
   const handleClose = () => {
+    const hadSuccessfulImport = result !== null;
     reset();
     onClose();
+    // Refresh data paket di halaman induk BARU setelah modal ditutup — memanggilnya
+    // lebih awal (saat hasil impor baru saja tampil) memicu skeleton loading di
+    // seluruh halaman induk, yang meng-unmount modal ini sebelum pesan hasilnya sempat dibaca.
+    if (hadSuccessfulImport) {
+      onSuccess();
+    }
   };
 
   const handleUpload = async () => {
@@ -76,7 +83,6 @@ export function ExcelImportPanel({ packageId, isOpen, onClose, onSuccess }: Exce
       }
 
       setResult(data.data);
-      onSuccess();
     } catch (err: any) {
       setErrorMessage(err.message || "Terjadi kesalahan jaringan saat mengunggah file.");
     } finally {
