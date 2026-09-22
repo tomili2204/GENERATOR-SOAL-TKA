@@ -14,11 +14,46 @@ import {
   Zap,
   ShieldCheck,
   ExternalLink,
+  RefreshCw,
+  AlertTriangle,
+  Ban,
+  Plus,
+  X,
 } from "lucide-react";
 
 interface AiSettingsFormProps {
   onSaved?: () => void;
 }
+
+interface ModelCatalogEntry {
+  id: string;
+  displayName: string;
+  description: string;
+  badges: string[];
+}
+
+function formatCachedAt(cachedAt: string | null): string {
+  if (!cachedAt) return "belum pernah";
+  try {
+    return new Date(cachedAt).toLocaleString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return cachedAt;
+  }
+}
+
+const BADGE_STYLES: Record<string, string> = {
+  "Stabil": "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "Direkomendasikan (Terbaru)": "bg-indigo-50 text-indigo-700 border-indigo-200",
+  "Pro — lebih mahal, cocok untuk eskalasi kasus sulit saja": "bg-violet-50 text-violet-700 border-violet-200",
+  "Hemat Biaya — tidak disarankan untuk generate soal (constraint-following lebih lemah)": "bg-amber-50 text-amber-700 border-amber-200",
+  "Preview — dapat berubah sewaktu-waktu": "bg-slate-100 text-slate-600 border-slate-300",
+};
 
 export function AiSettingsForm({ onSaved }: AiSettingsFormProps) {
   const [apiKey, setApiKey] = useState("");
@@ -29,6 +64,19 @@ export function AiSettingsForm({ onSaved }: AiSettingsFormProps) {
   const [customPromptPrefix, setCustomPromptPrefix] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [strictSvgMode, setStrictSvgMode] = useState(false);
+
+  // Katalog Model Dinamis
+  const [modelCatalog, setModelCatalog] = useState<ModelCatalogEntry[]>([]);
+  const [catalogCachedAt, setCatalogCachedAt] = useState<string | null>(null);
+  const [catalogStale, setCatalogStale] = useState(false);
+  const [activeModelDeprecated, setActiveModelDeprecated] = useState(false);
+  const [isRefreshingModels, setIsRefreshingModels] = useState(false);
+  const [refreshMsg, setRefreshMsg] = useState("");
+
+  // Daftar Blokir Model
+  const [blocklist, setBlocklist] = useState<string[]>([]);
+  const [blocklistInput, setBlocklistInput] = useState("");
+  const [isSavingBlocklist, setIsSavingBlocklist] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -52,6 +100,13 @@ export function AiSettingsForm({ onSaved }: AiSettingsFormProps) {
           if (typeof data.data.temperature === "number") setTemperature(data.data.temperature);
           if (data.data.customPromptPrefix) setCustomPromptPrefix(data.data.customPromptPrefix);
           if (typeof data.data.strictSvgMode === "boolean") setStrictSvgMode(data.data.strictSvgMode);
+          if (data.data.modelCatalog) {
+            setModelCatalog(data.data.modelCatalog.models || []);
+            setCatalogCachedAt(data.data.modelCatalog.cachedAt || null);
+            setCatalogStale(!!data.data.modelCatalog.cacheStale);
+          }
+          if (Array.isArray(data.data.modelBlocklist)) setBlocklist(data.data.modelBlocklist);
+          setActiveModelDeprecated(!!data.data.activeModelDeprecated);
         }
       } catch (err) {
         console.error("Gagal memuat setting AI:", err);
@@ -61,6 +116,74 @@ export function AiSettingsForm({ onSaved }: AiSettingsFormProps) {
     }
     loadConfig();
   }, []);
+
+  async function handleRefreshModels() {
+    setIsRefreshingModels(true);
+    setRefreshMsg("");
+    try {
+      const res = await fetch("/api/admin/settings/ai/refresh-models", { method: "POST" });
+      const data = await res.json();
+      if (res.ok && data.success && data.data?.modelCatalog) {
+        setModelCatalog(data.data.modelCatalog.models || []);
+        setCatalogCachedAt(data.data.modelCatalog.cachedAt || null);
+        setCatalogStale(!!data.data.modelCatalog.cacheStale);
+        setActiveModelDeprecated(!!data.data.activeModelDeprecated);
+        setRefreshMsg(data.message || "Katalog model diperbarui.");
+      } else {
+        setRefreshMsg(data.error || "Gagal memperbarui daftar model.");
+      }
+    } catch (err: any) {
+      setRefreshMsg(`Kendala jaringan: ${err.message}`);
+    } finally {
+      setIsRefreshingModels(false);
+      setTimeout(() => setRefreshMsg(""), 6000);
+    }
+  }
+
+  async function handleAddBlocklist() {
+    const entry = blocklistInput.trim();
+    if (!entry || blocklist.includes(entry)) {
+      setBlocklistInput("");
+      return;
+    }
+    const next = [...blocklist, entry];
+    await saveBlocklist(next);
+    setBlocklistInput("");
+  }
+
+  async function handleRemoveBlocklist(entry: string) {
+    const next = blocklist.filter((b) => b !== entry);
+    await saveBlocklist(next);
+  }
+
+  async function saveBlocklist(next: string[]) {
+    setIsSavingBlocklist(true);
+    try {
+      const res = await fetch("/api/admin/settings/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blocklist: next }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBlocklist(next);
+        // Katalog di layar perlu disaring ulang dengan blocklist baru. Cukup baca ulang dari
+        // cache server yang sudah ada (murah, tidak memanggil Google lagi kecuali cache basi).
+        const refreshed = await fetch("/api/admin/settings/ai");
+        const refreshedData = await refreshed.json();
+        if (refreshed.ok && refreshedData.success && refreshedData.data?.modelCatalog) {
+          setModelCatalog(refreshedData.data.modelCatalog.models || []);
+          setCatalogCachedAt(refreshedData.data.modelCatalog.cachedAt || null);
+          setCatalogStale(!!refreshedData.data.modelCatalog.cacheStale);
+          setActiveModelDeprecated(!!refreshedData.data.activeModelDeprecated);
+        }
+      }
+    } catch (err) {
+      console.error("Gagal menyimpan daftar blokir model:", err);
+    } finally {
+      setIsSavingBlocklist(false);
+    }
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -259,24 +382,71 @@ export function AiSettingsForm({ onSaved }: AiSettingsFormProps) {
 
           {/* Model Selection */}
           <div>
-            <label className="block text-xs font-bold font-mono text-slate-800 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <Cpu className="w-3.5 h-3.5 text-indigo-600" />
-              Pilihan Model Gemini
+            <label className="block text-xs font-bold font-mono text-slate-800 uppercase tracking-wider mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5 text-indigo-600" />
+                Pilihan Model Gemini
+              </span>
+              <button
+                type="button"
+                onClick={handleRefreshModels}
+                disabled={isRefreshingModels}
+                className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 normal-case disabled:opacity-50"
+                title="Panggil ulang daftar model dari Google sekarang (abaikan cache 24 jam)"
+              >
+                <RefreshCw className={`w-3 h-3 ${isRefreshingModels ? "animate-spin" : ""}`} />
+                Refresh Daftar Model Sekarang
+              </button>
             </label>
             <p className="text-[11px] text-slate-500 mb-2">
               Pilih varian model AI yang digunakan untuk menyusun stimulus dan butir soal TKA.
             </p>
+
+            {activeModelDeprecated && (
+              <div className="mb-2 p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-[11px] text-amber-900 flex items-start gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  Model yang sedang aktif (<code className="font-mono font-bold">{modelName}</code>) sudah tidak
+                  terdaftar di katalog Google terbaru — kemungkinan sudah dihentikan. Segera pilih model pengganti.
+                </span>
+              </div>
+            )}
 
             <select
               value={modelName}
               onChange={(e) => setModelName(e.target.value)}
               className="w-full text-xs font-mono px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-800"
             >
-              <option value="gemini-3-flash-preview">gemini-3-flash-preview (Rekomendasi Utama — Paling Stabil, Cerdas & Tahan Beban)</option>
-              <option value="gemini-2.5-flash">gemini-2.5-flash (Model Flash Standar Google)</option>
-              <option value="gemini-flash-latest">gemini-flash-latest (Selalu Versi Flash Terbaru)</option>
-              <option value="gemini-3.1-flash-lite-preview">gemini-3.1-flash-lite-preview (Model Super Cepat & Ringan)</option>
+              {!modelCatalog.some((m) => m.id === modelName) && (
+                <option value={modelName}>{modelName} (aktif, tidak ada di katalog saat ini)</option>
+              )}
+              {modelCatalog.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.id} {m.badges.length > 0 ? `— ${m.badges.join(", ")}` : ""}
+                </option>
+              ))}
             </select>
+
+            {modelCatalog.find((m) => m.id === modelName) && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {modelCatalog
+                  .find((m) => m.id === modelName)!
+                  .badges.map((b) => (
+                    <span
+                      key={b}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-sans font-medium border ${BADGE_STYLES[b] || "bg-slate-50 text-slate-600 border-slate-200"}`}
+                    >
+                      {b}
+                    </span>
+                  ))}
+              </div>
+            )}
+
+            <p className="mt-1.5 text-[10px] text-slate-400 font-mono">
+              Daftar diperbarui otomatis tiap 24 jam · Terakhir: {formatCachedAt(catalogCachedAt)}
+              {catalogStale && <span className="text-amber-600"> (gagal memuat ulang, menampilkan data lama)</span>}
+            </p>
+            {refreshMsg && <p className="mt-1 text-[10px] text-indigo-600 font-sans">{refreshMsg}</p>}
           </div>
         </div>
 
@@ -371,6 +541,68 @@ export function AiSettingsForm({ onSaved }: AiSettingsFormProps) {
                 strictSvgMode ? "translate-x-7" : "translate-x-0"
               }`}
             />
+          </button>
+        </div>
+      </div>
+
+      {/* Daftar Blokir Model (Blocklist) */}
+      <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-3">
+        <div className="space-y-1">
+          <h4 className="text-xs font-bold font-mono text-slate-900 uppercase flex items-center gap-2">
+            <Ban className="w-3.5 h-3.5 text-rose-500" />
+            Daftar Blokir Model (Blocklist)
+          </h4>
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            Model/alias dengan id persis sama seperti daftar ini akan disembunyikan dari katalog di atas, mis. alias
+            rolling seperti <code className="font-mono">gemini-flash-latest</code> yang riwayatnya pernah 404
+            mendadak akibat diam-diam di-resolve ke model yang sudah dihentikan Google. Tambah/hapus sendiri di sini
+            kapan pun tanpa perlu revisi kode.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {blocklist.length === 0 && <span className="text-[11px] text-slate-400 italic">Belum ada entri diblokir.</span>}
+          {blocklist.map((entry) => (
+            <span
+              key={entry}
+              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white border border-rose-200 text-rose-700 text-[11px] font-mono"
+            >
+              {entry}
+              <button
+                type="button"
+                onClick={() => handleRemoveBlocklist(entry)}
+                disabled={isSavingBlocklist}
+                className="hover:text-rose-900 disabled:opacity-50"
+                title="Hapus dari daftar blokir"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={blocklistInput}
+            onChange={(e) => setBlocklistInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAddBlocklist();
+              }
+            }}
+            placeholder="mis. gemini-pro-latest"
+            className="flex-1 text-xs font-mono px-3 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-400 bg-white"
+          />
+          <button
+            type="button"
+            onClick={handleAddBlocklist}
+            disabled={isSavingBlocklist || !blocklistInput.trim()}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Blokir
           </button>
         </div>
       </div>

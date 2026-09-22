@@ -4,6 +4,7 @@ import { db, ensureTablesCreated } from "@/db";
 import { systemSettings, auditLogs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getStoredAiConfig } from "@/lib/generator/gemini-generator";
+import { getModelCatalog, setModelBlocklist } from "@/lib/generator/model-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,10 @@ export async function GET() {
       }
     }
 
+    const catalog = await getModelCatalog(false);
+    const activeModelDeprecated =
+      catalog.rawModelIds !== null && catalog.rawModelIds.length > 0 && !catalog.rawModelIds.includes(config.modelName);
+
     return NextResponse.json({
       success: true,
       data: {
@@ -36,6 +41,14 @@ export async function GET() {
         customPromptPrefix: config.customPromptPrefix || "",
         strictSvgMode: !!config.strictSvgMode,
         nanoBananaEnabled: !!config.nanoBananaEnabled,
+        modelCatalog: {
+          models: catalog.models,
+          cachedAt: catalog.cachedAt,
+          cacheStale: catalog.cacheStale,
+          source: catalog.source,
+        },
+        modelBlocklist: catalog.blocklist,
+        activeModelDeprecated,
       },
     });
   } catch (error) {
@@ -49,7 +62,35 @@ export async function POST(req: NextRequest) {
     await ensureTablesCreated();
 
     const body = await req.json();
-    const { apiKey, modelName, temperature, customPromptPrefix, strictSvgMode, nanoBananaEnabled } = body;
+    const { apiKey, modelName, temperature, customPromptPrefix, strictSvgMode, nanoBananaEnabled, blocklist } = body;
+
+    // Blocklist model disimpan di key systemSettings TERPISAH (gemini_model_blocklist), bukan
+    // di dalam ai_gemini_config. Ditangani independen agar UI bisa menyimpan blocklist saja
+    // tanpa perlu mengirim ulang seluruh field form pengaturan AI.
+    if (Array.isArray(blocklist)) {
+      await setModelBlocklist(blocklist);
+      await db.insert(auditLogs).values({
+        id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        userId: user.id,
+        userEmail: user.email,
+        action: "UPDATE_GEMINI_MODEL_BLOCKLIST",
+        targetResource: "system_settings/gemini_model_blocklist",
+        details: { blocklist },
+        ipAddress: req.headers.get("x-forwarded-for") || "127.0.0.1",
+      });
+
+      // Jika request HANYA berisi blocklist (tidak ada field pengaturan AI lain), cukup selesai di sini.
+      if (
+        apiKey === undefined &&
+        modelName === undefined &&
+        temperature === undefined &&
+        customPromptPrefix === undefined &&
+        strictSvgMode === undefined &&
+        nanoBananaEnabled === undefined
+      ) {
+        return NextResponse.json({ success: true, message: "Daftar blokir model berhasil disimpan.", data: { blocklist } });
+      }
+    }
 
     // Ambil setting lama jika ada
     const existing = await db
