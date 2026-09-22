@@ -66,15 +66,30 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       );
     }
 
-    // Ambil soal yang sudah ada di paket ini: untuk deteksi duplikat & cari slot kosong
+    // Ambil soal yang sudah ada di paket ini: untuk mencocokkan pembaruan & cari slot kosong
     const existingQuestions = await db
-      .select({ nomorUrut: questions.nomorUrut, payload: questions.payload })
+      .select({
+        id: questions.id,
+        code: questions.code,
+        nomorUrut: questions.nomorUrut,
+        status: questions.status,
+        validationNotes: questions.validationNotes,
+        payload: questions.payload,
+        bentukSoal: questions.bentukSoal,
+        elemen: questions.elemen,
+        subElemen: questions.subElemen,
+        kompetensi: questions.kompetensi,
+        levelKognitif: questions.levelKognitif,
+        tingkatKesulitan: questions.tingkatKesulitan,
+      })
       .from(questions)
       .where(eq(questions.paketId, pkg.id));
 
-    const existingTexts = new Set(
-      existingQuestions.map((q: any) => String(q.payload?.soal_text || "").trim())
-    );
+    const existingByText = new Map<string, (typeof existingQuestions)[number]>();
+    existingQuestions.forEach((q: any) => {
+      const text = String(q.payload?.soal_text || "").trim();
+      if (text) existingByText.set(text, q);
+    });
     const usedSlots = new Set(existingQuestions.map((q: any) => q.nomorUrut).filter((n: any) => n != null));
     const emptySlots: number[] = [];
     for (let i = 1; i <= 30; i++) {
@@ -82,17 +97,75 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     let importedCount = 0;
-    let duplicateCount = 0;
+    let updatedCount = 0;
+    let unchangedCount = 0;
+    let lockedCount = 0;
     let capacityCount = 0;
     const details: Array<{ no: string; status: string; slotNumber?: number }> = [];
     const insertValues: any[] = [];
+    const updateOps: Array<{ id: string; values: any }> = [];
 
     for (const row of parseResult.rows) {
-      if (existingTexts.has(row.soalText.trim())) {
-        duplicateCount++;
-        details.push({ no: row.no, status: "dilewati_duplikat" });
+      const newPayload = {
+        soal_text: row.soalText,
+        gambar: row.gambar,
+        opsi: row.opsi,
+        pernyataan: row.pernyataan,
+        kategori_respons: row.kategoriRespons,
+        kunci_jawaban: row.kunciJawaban,
+        pembahasan: row.pembahasan,
+      };
+
+      const existing = existingByText.get(row.soalText.trim());
+
+      if (existing) {
+        // Soal ini sudah pernah diimpor/diisi sebelumnya (teks soal persis sama) -> mode PERBARUI, bukan buat baru.
+        if (existing.status === "disetujui" && !hasAnyRole(user, ["admin"])) {
+          lockedCount++;
+          details.push({ no: row.no, status: "dilewati_terkunci_disetujui" });
+          continue;
+        }
+
+        const taxonomyChanged =
+          existing.bentukSoal !== row.bentukSoal ||
+          existing.elemen !== row.elemen ||
+          (existing.subElemen || "") !== (row.subElemen || "") ||
+          existing.kompetensi !== row.kompetensi ||
+          existing.levelKognitif !== row.levelKognitif ||
+          existing.tingkatKesulitan !== row.tingkatKesulitan;
+        const payloadChanged = JSON.stringify(existing.payload) !== JSON.stringify(newPayload);
+
+        if (!taxonomyChanged && !payloadChanged) {
+          unchangedCount++;
+          details.push({ no: row.no, status: "tidak_ada_perubahan", slotNumber: existing.nomorUrut ?? undefined });
+          continue;
+        }
+
+        updateOps.push({
+          id: existing.id,
+          values: {
+            elemen: row.elemen,
+            subElemen: row.subElemen || null,
+            kompetensi: row.kompetensi,
+            levelKognitif: row.levelKognitif,
+            tingkatKesulitan: row.tingkatKesulitan,
+            bentukSoal: row.bentukSoal,
+            status: "menunggu_validasi",
+            validatorId: null,
+            validationNotes: null,
+            validatedAt: null,
+            payload: newPayload,
+            previousPayload: existing.payload,
+            previousValidationNotes: existing.validationNotes,
+            updatedAt: new Date(),
+          },
+        });
+        updatedCount++;
+        details.push({ no: row.no, status: "berhasil_diperbarui", slotNumber: existing.nomorUrut ?? undefined });
         continue;
       }
+
+      // Soal benar-benar baru -> isi ke slot kosong berikutnya
       const slotNumber = emptySlots.shift();
       if (slotNumber === undefined) {
         capacityCount++;
@@ -124,25 +197,35 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         validatorId: null,
         validationNotes: null,
         validatedAt: null,
-        payload: {
-          soal_text: row.soalText,
-          gambar: row.gambar,
-          opsi: row.opsi,
-          pernyataan: row.pernyataan,
-          kategori_respons: row.kategoriRespons,
-          kunci_jawaban: row.kunciJawaban,
-          pembahasan: row.pembahasan,
-        },
+        payload: newPayload,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
       importedCount++;
       details.push({ no: row.no, status: "berhasil_diimpor", slotNumber });
-      existingTexts.add(row.soalText.trim());
+      // Cegah baris lain dalam file yang sama dengan teks soal identik dibuat sebagai duplikat baru;
+      // baris berikutnya yang cocok akan masuk jalur perbarui terhadap soal yang baru saja disisipkan ini.
+      existingByText.set(row.soalText.trim(), {
+        id: questionId,
+        code: itemCode,
+        nomorUrut: slotNumber,
+        status: "menunggu_validasi",
+        validationNotes: null,
+        payload: newPayload,
+        bentukSoal: row.bentukSoal,
+        elemen: row.elemen,
+        subElemen: row.subElemen || null,
+        kompetensi: row.kompetensi,
+        levelKognitif: row.levelKognitif,
+        tingkatKesulitan: row.tingkatKesulitan,
+      } as any);
     }
 
     for (const values of insertValues) {
       await db.insert(questions).values(values);
+    }
+    for (const op of updateOps) {
+      await db.update(questions).set(op.values).where(eq(questions.id, op.id));
     }
 
     // Hitung ulang status paket setelah impor
@@ -162,16 +245,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       userEmail: user.email,
       action: "IMPORT_EXCEL_SOAL",
       targetResource: `question_packages/${pkg.code}`,
-      details: { packageId: pkg.id, fileName: file.name, importedCount, duplicateCount, capacityCount },
+      details: { packageId: pkg.id, fileName: file.name, importedCount, updatedCount, unchangedCount, lockedCount, capacityCount },
       ipAddress: req.headers.get("x-forwarded-for") || "127.0.0.1",
     });
 
+    const messageParts = [`${importedCount} soal baru berhasil diimpor`];
+    if (updatedCount > 0) messageParts.push(`${updatedCount} soal diperbarui`);
+    if (unchangedCount > 0) messageParts.push(`${unchangedCount} soal tidak berubah`);
+    if (lockedCount > 0) messageParts.push(`${lockedCount} soal dilewati karena sudah disetujui (terkunci)`);
+    if (capacityCount > 0) messageParts.push(`${capacityCount} soal dilewati karena paket sudah penuh (30/30 slot)`);
+
     return NextResponse.json({
       success: true,
-      message: `${importedCount} soal berhasil diimpor dan masuk antrean validasi.${
-        duplicateCount > 0 ? ` ${duplicateCount} soal dilewati karena duplikat.` : ""
-      }${capacityCount > 0 ? ` ${capacityCount} soal dilewati karena paket sudah penuh (30/30 slot).` : ""}`,
-      data: { importedCount, duplicateCount, capacityCount, details, packageProgress: progress },
+      message: `${messageParts.join(", ")}. Soal baru/diperbarui masuk antrean validasi.`,
+      data: { importedCount, updatedCount, unchangedCount, lockedCount, capacityCount, details, packageProgress: progress },
     });
   } catch (error: any) {
     console.error("POST /api/packages/[id]/import-excel error:", error);

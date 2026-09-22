@@ -11,7 +11,9 @@ interface RowError {
 
 interface ImportResult {
   importedCount: number;
-  duplicateCount: number;
+  updatedCount: number;
+  unchangedCount: number;
+  lockedCount: number;
   capacityCount: number;
 }
 
@@ -108,8 +110,10 @@ export function ExcelImportPanel({ packageId, isOpen, onClose, onSuccess }: Exce
             <>
               <div className="p-3.5 rounded-xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-800 leading-relaxed">
                 File harus mengikuti template resmi: sheet <strong>"Soal"</strong> (data butir soal) dan{" "}
-                <strong>"Referensi Kompetensi"</strong> (kamus kode kompetensi). Soal baru akan ditambahkan ke slot
-                kosong; soal dengan teks persis sama seperti yang sudah ada di paket ini otomatis dilewati.
+                <strong>"Referensi Kompetensi"</strong> (kamus kode kompetensi). Soal dengan teks baru akan
+                ditambahkan ke slot kosong. Soal dengan teks yang <strong>persis sama</strong> dengan yang sudah ada
+                di paket ini akan <strong>diperbarui</strong> (mis. melengkapi pembahasan) dan otomatis dikirim ulang
+                ke antrean validasi — kecuali soal itu sudah berstatus disetujui (terkunci).
               </div>
 
               <label className="block border-2 border-dashed border-slate-300 rounded-xl p-8 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/40 transition-colors">
@@ -162,15 +166,24 @@ export function ExcelImportPanel({ packageId, isOpen, onClose, onSuccess }: Exce
             <div className="space-y-3">
               <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                <div className="text-xs text-emerald-900">
-                  <p className="font-bold">{result.importedCount} soal berhasil diimpor</p>
-                  <p className="mt-0.5">Status soal: menunggu validasi, sama seperti alur unggah manual.</p>
+                <div className="text-xs text-emerald-900 space-y-0.5">
+                  <p className="font-bold">{result.importedCount} soal baru berhasil diimpor</p>
+                  {result.updatedCount > 0 && (
+                    <p className="font-bold">{result.updatedCount} soal yang sudah ada berhasil diperbarui</p>
+                  )}
+                  <p className="mt-0.5">Soal baru/diperbarui: menunggu validasi, sama seperti alur unggah manual.</p>
                 </div>
               </div>
-              {result.duplicateCount > 0 && (
+              {result.unchangedCount > 0 && (
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-slate-400" />
+                  <span>{result.unchangedCount} soal dilewati karena tidak ada perubahan sama sekali dari versi yang sudah tersimpan.</span>
+                </div>
+              )}
+              {result.lockedCount > 0 && (
                 <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>{result.duplicateCount} soal dilewati karena teksnya sama persis dengan soal yang sudah ada.</span>
+                  <span>{result.lockedCount} soal dilewati karena sudah disetujui validator (terkunci dari perubahan).</span>
                 </div>
               )}
               {result.capacityCount > 0 && (
