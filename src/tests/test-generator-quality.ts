@@ -1,4 +1,5 @@
-import { BSKAP_SYSTEM_PROMPT, generateMockGeminiBatchResponse } from "../lib/generator/gemini-generator";
+import { generateMockGeminiBatchResponse } from "../lib/generator/gemini-generator";
+import { buildSystemPrompt } from "../lib/generator/prompt-builder";
 import { validateLatexDelimiters } from "../lib/validations/latex";
 
 async function runQualityTests() {
@@ -23,19 +24,23 @@ async function runQualityTests() {
   // 1. System Prompt Compliance Tests
   // ------------------------------------------------------------------
   console.log("--- 1. BSKAP & Pusmendik System Prompt Compliance ---");
-  assert(BSKAP_SYSTEM_PROMPT.includes("Kementerian Pendidikan Dasar dan Menengah RI"), "Contains official Ministry name");
-  assert(BSKAP_SYSTEM_PROMPT.includes("Perkaban BSKAP No. 45/2025"), "Contains BSKAP 45/2025 reference");
-  assert(BSKAP_SYSTEM_PROMPT.includes("No. 47/2025"), "Contains BSKAP 47/2025 reference");
-  assert(BSKAP_SYSTEM_PROMPT.includes("FORMAT KELUARAN — WAJIB, TIDAK BOLEH DILANGGAR"), "Contains exact format instruction string");
-  assert(BSKAP_SYSTEM_PROMPT.includes("PGK_MCMA") && BSKAP_SYSTEM_PROMPT.includes("PGK_KATEGORI"), "Contains all required question types");
-  assert(BSKAP_SYSTEM_PROMPT.includes("MATRIKS ASESMEN RESMI PUSMENDIK KEMENDIKDASMEN"), "Contains Pusmendik Assessment Matrix header");
-  assert(BSKAP_SYSTEM_PROMPT.includes("Bilangan Rasional") && BSKAP_SYSTEM_PROMPT.includes("Objek Geometri"), "Contains SD Matematika Pusmendik competencies");
-  assert(BSKAP_SYSTEM_PROMPT.includes("PLSV, PtLSV, SPLDV") && BSKAP_SYSTEM_PROMPT.includes("Bilangan Real"), "Contains SMP Matematika Pusmendik competencies");
-  assert(BSKAP_SYSTEM_PROMPT.includes("Pemahaman Tekstual") && BSKAP_SYSTEM_PROMPT.includes("Pemahaman Inferensial"), "Contains Bahasa Indonesia reading competencies");
-  assert(BSKAP_SYSTEM_PROMPT.includes("ANTI-TRIVIAL & WAJIB MULTI-STEP REASONING (HOTS)"), "Contains Anti-Trivial & HOTS quality guidelines");
-  assert(BSKAP_SYSTEM_PROMPT.includes("Dilarang keras membuat soal satu langkah sederhana"), "Forbids trivial arithmetic");
-  assert(BSKAP_SYSTEM_PROMPT.includes("SINKRONISASI MUTLAK STIMULUS DENGAN BUTIR SOAL"), "Enforces absolute stimulus cohesion");
-  assert(BSKAP_SYSTEM_PROMPT.includes("DUKUNGAN REPRESENTASI VISUAL & TABEL DATA"), "Includes Markdown table and SVG visual support");
+  const matSmp = buildSystemPrompt("SMP/MTs", "Matematika");
+  const binSmp = buildSystemPrompt("SMP/MTs", "Bahasa Indonesia");
+  const binSma = buildSystemPrompt("SMA/MA", "Bahasa Indonesia");
+  for (const [label, prompt] of [["MAT SMP", matSmp], ["BIN SMP", binSmp]] as const) {
+    assert(prompt.includes("Kementerian Pendidikan Dasar dan Menengah RI"), `${label}: contains official Ministry name`);
+    assert(prompt.includes("Perkaban BSKAP No. 45/2025") && prompt.includes("No. 47/2025"), `${label}: contains BSKAP 45/2025 & 47/2025 references`);
+    assert(prompt.includes("FORMAT KELUARAN — WAJIB, TIDAK BOLEH DILANGGAR"), `${label}: contains exact format instruction string`);
+    assert(prompt.includes("PGK_MCMA") && prompt.includes("PGK_KATEGORI"), `${label}: contains all required question types`);
+    assert(prompt.includes("CONTOH ACUAN GAYA SOAL TKA RESMI"), `${label}: contains Pusmendik-style few-shot exemplars`);
+    assert(prompt.includes("Satu persamaan utuh berada di dalam SATU pasangan $...$"), `${label}: contains single-equation LaTeX rule`);
+    assert(!/arkeolog|pilot drone|teknisi menara/i.test(prompt), `${label}: does not name specific banned professions (anchoring)`);
+  }
+  assert(matSmp.includes("KETENTUAN MATEMATIKA") && !matSmp.includes("KETENTUAN BAHASA"), "MAT prompt carries only math rules");
+  assert(binSmp.includes("KETENTUAN BAHASA") && !binSmp.includes("KETENTUAN MATEMATIKA"), "BIN prompt carries only language rules");
+  assert(binSmp.includes("Pemahaman Tekstual") && binSmp.includes("Mengakses dan Menemukan Informasi"), "BIN prompt contains both domestic and PISA taxonomies");
+  assert(binSmp.includes("200-250 kata"), "SMP BIN prompt uses SMP text length");
+  assert(binSma.includes("250-300 kata") && !binSma.includes("200-250 kata"), "SMA BIN prompt uses SMA text length (not SMP)");
 
   // ------------------------------------------------------------------
   // 2. Mock Generator Quality (Matematika SD/MI & SMP)

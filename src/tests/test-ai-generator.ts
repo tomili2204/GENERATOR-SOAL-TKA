@@ -1,8 +1,7 @@
-import {
-  BSKAP_SYSTEM_PROMPT,
-  generateBatchQuestions,
-  generateMockGeminiBatchResponse,
-} from "../lib/generator/gemini-generator";
+import { generateBatchQuestions, generateMockGeminiBatchResponse } from "../lib/generator/gemini-generator";
+import { buildSystemPrompt } from "../lib/generator/prompt-builder";
+
+const BSKAP_SYSTEM_PROMPT = buildSystemPrompt("SD/MI", "Matematika");
 import { db } from "../db";
 import { generationLogs, questionPackages, questions, stimulus } from "../db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -27,7 +26,7 @@ async function runTests() {
   console.log("--- 1. Uji Integritas System Prompt BSKAP ---");
   assert(
     BSKAP_SYSTEM_PROMPT.includes(
-      "Anda adalah pengembang soal Tes Kemampuan Akademik (TKA) profesional, bekerja untuk Kementerian Pendidikan Dasar dan Menengah RI."
+      "Anda adalah pengembang soal Tes Kemampuan Akademik (TKA) profesional untuk Kementerian Pendidikan Dasar dan Menengah RI."
     ),
     "System prompt memiliki deklarasi peran Kementerian Pendidikan Dasar dan Menengah RI"
   );
@@ -38,8 +37,8 @@ async function runTests() {
     "System prompt memuat rujukan resmi Perkaban BSKAP No. 45/2025 dan No. 47/2025"
   );
   assert(
-    BSKAP_SYSTEM_PROMPT.includes("PG: pilihan ganda sederhana") &&
-      BSKAP_SYSTEM_PROMPT.includes("PGK_MCMA: beberapa opsi") &&
+    BSKAP_SYSTEM_PROMPT.includes("PG: pilihan ganda") &&
+      BSKAP_SYSTEM_PROMPT.includes("PGK_MCMA: pilihan ganda kompleks") &&
       BSKAP_SYSTEM_PROMPT.includes("PGK_KATEGORI: beberapa pernyataan"),
     "System prompt membatasi 3 bentuk soal resmi (PG, PGK_MCMA, PGK_KATEGORI)"
   );

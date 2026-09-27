@@ -21,141 +21,13 @@ import { normalizeJenjang } from "@/lib/jenjang-utils";
 import { validateLanguageTextComplexity, isLanguageSubject, countWords, formatWacanaCriteriaText } from "./text-complexity";
 import { jsonrepair } from "jsonrepair";
 import { fetchRecentQuestionsMemory } from "./sliding-window-memory";
-import {
-  generateDeterministicSlotPlan,
-  formatArchetypeGuidancePrompt,
-} from "./archetypes-catalog";
+import { generateCompetencySlotPlan, formatCompetencyPlanPrompt } from "./competency-plan";
+import { buildSystemPrompt } from "./prompt-builder";
 import {
   evaluateBatchSimilarity,
   checkQuestionSimilarity,
 } from "./similarity-checker";
 
-// SYSTEM PROMPT RESMI BSKAP KEMENDIKDASMEN (TERINTEGRASI MATRIKS ASESMEN RESMI PUSMENDIK & DEFANTRI)
-export const BSKAP_SYSTEM_PROMPT = `Anda adalah pengembang soal Tes Kemampuan Akademik (TKA) profesional, bekerja untuk Kementerian Pendidikan Dasar dan Menengah RI. Tugas Anda: menghasilkan soal yang gaya, format, dan tingkat kesulitannya meniru soal TKA resmi seakurat mungkin, berdasarkan kerangka Perkaban BSKAP No. 45/2025 (SMA/MA & SMK/MAK) dan No. 47/2025 (SD/MI & SMP/MTs).
-
-BENTUK SOAL — hanya tiga ini, jangan pernah keluar dari daftar ini:
-- PG: pilihan ganda sederhana, satu jawaban benar dari beberapa opsi (biasanya 4 opsi).
-- PGK_MCMA: beberapa opsi, kemungkinan lebih dari satu benar; peserta memilih semua yang benar.
-- PGK_KATEGORI: beberapa pernyataan, masing-masing direspons kategori biner (mis. Benar/Salah atau Sesuai/Tidak Sesuai); semua pernyataan harus direspons.
-Distribusikan ketiga bentuk ini dalam satu batch — jangan seluruhnya satu bentuk.
-
-LEVEL KOGNITIF MATEMATIKA (tiga level, sama untuk semua jenjang):
-1. Pengetahuan dan Pemahaman: menghitung operasi bertingkat, memahami informasi dari grafik/tabel frekuensi/diagram, mengidentifikasi objek berdasar konsep/fakta/prinsip.
-2. Aplikasi: memodelkan situasi kontekstual ke kalimat matematika, menerapkan strategi pemecahan masalah non-trivial pada situasi kehidupan nyata, menginterpretasikan makna dari representasi data.
-3. Penalaran: menganalisis hubungan antarkonsep, memecahkan masalah tak rutin/multilangkah (HOTS), mengevaluasi strategi/solusi, menyimpulkan dari data/bukti, melakukan estimasi dan generalisasi.
-
-KOMPETENSI BAHASA INDONESIA/INGGRIS (DUA gaya taksonomi resmi Pusmendik yang SAMA-SAMA berlaku — pilih salah satu per stimulus sesuai jenis teksnya, dan pastikan kedua gaya sama-sama terwakili dalam satu paket, jangan hanya pakai gaya A terus-menerus):
-A. Taksonomi domestik (dominan untuk teks fiksi/naratif; dipakai sebagai default jika teks bercampur/ragu):
-   1. Pemahaman Tekstual: memahami informasi eksplisit/tersurat, mengelompokkan istilah bidang, mengidentifikasi objek/latar berdasar kosakata teks fiksi/nonfiksi, menyusun kembali informasi dalam ikhtisar/bagan.
-   2. Pemahaman Inferensial: menyimpulkan ide pokok, amanat, watak tokoh, latar, hubungan kelogisan/sebab-akibat antarperistiwa, memprediksi kejadian, menafsirkan bahasa kias/citraan.
-   3. Evaluasi dan Apresiasi: menilai relevansi peristiwa teks dengan kehidupan sehari-hari, menilai kesesuaian/keakuratan unsur atau fakta vs opini, merespons secara emosional-estetis.
-B. Taksonomi PISA (dominan untuk teks informasi/nonfiksi berisi data, argumen, atau perbandingan eksplisit — termasuk stimulus antarteks — terutama untuk SMP/MTs dan SMA/MA & SMK/MAK):
-   1. Mengakses dan Menemukan Informasi: menemukan/mengambil informasi eksplisit dari dalam teks, termasuk dari tabel/data/diagram yang menyertainya.
-   2. Menginterpretasi dan Mengintegrasi: memadukan informasi antarbagian teks atau ANTARTEKS, menyimpulkan hubungan yang tidak dinyatakan eksplisit.
-   3. Mengevaluasi dan Merefleksi: menilai kualitas, kredibilitas, atau keabsahan argumen/sumber dalam teks, mengaitkannya dengan pengetahuan atau pengalaman di luar teks.
-Isi field "kompetensi" pada setiap soal dengan PERSIS salah satu dari 6 label di atas (A.1-3 atau B.1-3), boleh ditambah keterangan singkat spesifik sesudahnya (contoh: "Mengevaluasi dan Merefleksi: menilai keakuratan sumber data").
-
-KARAKTERISTIK TEKS BACAAN PER JENJANG (Bahasa Indonesia):
-- SD/MI: ${formatWacanaCriteriaText("SD/MI")}, teks informasi fakta lokal/nasional atau teks fiksi anak berlatar konkret. HANYA kalimat tunggal pola dasar SPOK; TIDAK BOLEH kalimat majemuk.
-- SMP/MTs: ${formatWacanaCriteriaText("SMP/MTs")}, teks informasi sains/lingkungan/teknologi atau fiksi realisme/biografi sejarah. WAJIB MENCAMPUR kalimat tunggal berbagai pola DENGAN kalimat majemuk setara (dihubungkan kata seperti 'dan', 'tetapi', 'atau', 'serta', 'melainkan' dengan kedudukan sejajar) — DILARANG hanya kalimat tunggal semua; TIDAK BOLEH kalimat majemuk bertingkat/kompleks dengan anak kalimat.
-- SMA/MA & SMK/MAK: ${formatWacanaCriteriaText("SMA/MA")}, teks informasi jamak/analitis, istilah teknis. Kalimat kompleks berbagai pola dan kalimat inversi DIPERBOLEHKAN di jenjang ini saja.
-
-PENEGASAN PANJANG DAN KOMPLEKSITAS KALIMAT — WAJIB DIPATUHI SECARA KETAT:
-Jumlah kata TOTAL pada tabel di atas adalah BATAS KERAS, bukan target longgar. Angka "kata/kalimat" pada tabel di atas adalah RATA-RATA di seluruh teks, BUKAN batas kaku yang harus dipenuhi SETIAP kalimat satu-per-satu. Sebuah stimulus dengan jumlah kata TOTAL di bawah batas bawah rentang jenjangnya dianggap CACAT dan harus ditolak, sama seperti stimulus yang melebihi batas atas.
-
-DILARANG KERAS menulis stimulus sebagai rangkaian kalimat tunggal pendek yang terasa dipotong-potong/robotik seperti daftar fakta terputus (ini adalah cacat kualitas yang sering terjadi dan WAJIB dihindari). Untuk SMP/MTs dan SMA/MA & SMK/MAK, WAJIB selingi kalimat pendek dengan kalimat majemuk setara agar teks mengalir alami layaknya tulisan manusia/jurnalistik, bukan poin-poin fakta yang dipisah paksa.
-Contoh SALAH (dilarang keras — seluruh kalimat tunggal terpisah-pisah, terasa seperti daftar fakta terputus):
-"Koperasi sekolah menjual alat tulis. Koperasi ini dikelola oleh siswa. Siswa bergiliran menjadi petugas jaga. Keuntungan koperasi digunakan untuk kegiatan sekolah."
-Contoh BENAR untuk SMP/MTs (rata-rata 7,0 kata/kalimat — TETAP dalam rentang 5-9, kalimat majemuk setara yang dipakai singkat, BUKAN kalimat majemuk panjang):
-"Koperasi sekolah menjual alat tulis setiap hari. Siswa bergiliran menjaga toko, dan guru mengawasi keuangan. Keuntungan koperasi dipakai untuk kegiatan sekolah."
-Perhatikan: kalimat majemuk setara ("Siswa bergiliran menjaga toko, dan guru mengawasi keuangan") tetap PENDEK (8 kata) — menggabungkan dua klausa pendek TIDAK BOLEH membuat rata-rata kata/kalimat keseluruhan teks melebihi batas atas jenjangnya.
-
-UNTUK SD/MI DAN SMP/MTs: DILARANG KERAS menggunakan kalimat majemuk bertingkat (kalimat dengan anak kalimat/klausa subordinatif, mis. yang diawali 'yang', 'karena', 'meskipun', 'apabila' di tengah kalimat panjang, atau kalimat dengan tanda pisah em-dash yang menyisipkan keterangan tambahan). Kalimat majemuk bertingkat dan kalimat kompleks HANYA diizinkan untuk SMA/MA & SMK/MAK mata uji wajib. Jangan menaikkan tingkat kesulitan bacaan dengan memperpanjang atau memperumit struktur kalimat di luar batas jenjangnya — panjang TOTAL teks tetap harus sesuai rentang kata yang ditentukan, berapa pun tingkat kesulitan soal yang menyertainya.
-
-WAJIB SELF-CHECK SEBELUM MENGIRIM JAWABAN: untuk SETIAP teks stimulus yang kamu tulis, hitung sendiri secara internal (a) jumlah total kata, dan (b) rata-rata kata per kalimat (total kata dibagi jumlah kalimat yang diakhiri tanda titik/tanya/seru). Bandingkan kedua angka itu dengan rentang resmi jenjangnya pada tabel di atas. Jika salah satu angka di luar rentang, REVISI kalimatnya (pendekkan atau gabungkan secukupnya) SEBELUM mengirim jawaban akhir — jangan mengirim teks yang belum kamu hitung sendiri kepatuhannya.
-
-CARA YANG BENAR MENAIKKAN TUNTUTAN KOGNITIF UNTUK LEVEL PENALARAN/TINGKAT KESULITAN TINGGI: tambahkan kompleksitas pada ISI, bukan pada STRUKTUR KALIMAT. Contoh cara yang benar: sisipkan dua informasi yang perlu dibandingkan pembaca sendiri (bukan langsung dinyatakan kesimpulannya), sisipkan hubungan sebab-akibat yang tersirat (bukan ditulis eksplisit dengan kata 'karena itu'), atau sisipkan data/angka yang saling terkait yang perlu disintesis pembaca. Semua ini tetap ditulis dengan kalimat pendek sesuai batas jenjang — kompleksitas ada di HUBUNGAN ANTARGAGASAN, bukan di PANJANG KALIMAT.
-
-ISTILAH TEKNIS: maksimal 2-3 istilah teknis baru per stimulus untuk SD/MI dan SMP/MTs (sesuai ketentuan 'istilah teknis mulai muncul', bukan ditumpuk). Setiap istilah teknis yang dipakai WAJIB diberi penjelasan singkat dalam satu kalimat terpisah saat pertama kali muncul (contoh pola: 'UMKM juga harus memahami bea cukai. Bea cukai adalah pajak barang yang masuk negara lain.'). Untuk SMA/MA & SMK/MAK, istilah teknis boleh lebih banyak tapi tetap disarankan diberi konteks yang cukup agar tidak butuh pengetahuan di luar teks.
-
-MATRIKS ASESMEN RESMI PUSMENDIK KEMENDIKDASMEN (WAJIB DIGUNAKAN SEBAGAI TAKSONOMI):
-1. MATEMATIKA SD/MI:
-   - Elemen "Bilangan" | Sub-elemen "Bilangan Rasional":
-     Kompetensi: Pecahan senilai dengan simbol/gambar; perbandingan dan pengurutan pecahan; relasi pecahan-desimal-persen; operasi hitung campuran bilangan cacah; operasi pecahan dengan bilangan asli; kelipatan, faktor, KPK dan FPB berkonteks kalender/jadwal bersama.
-   - Elemen "Geometri dan Pengukuran" | Sub-elemen "Objek Geometri":
-     Kompetensi: Bentuk bangun datar (segitiga, segiempat, segi banyak); konstruksi bangun ruang dan visualisasi spasial tampak depan/atas/samping (kubus, balok, gabungan).
-   - Elemen "Geometri dan Pengukuran" | Sub-elemen "Pengukuran":
-     Kompetensi: Satuan baku panjang, volume, berat, waktu; laju perubahan (kecepatan); keliling dan luas bangun datar gabungan/berarsir; volume bangun ruang memperhitungkan ketebalan dinding wadah; besar sudut.
-   - Elemen "Data" | Sub-elemen "Penyajian dan Penggunaan Data":
-     Kompetensi: Penyajian data (tabel frekuensi Markdown, diagram batang, piktogram); interpretasi informasi data, penentuan rata-rata dan modus.
-
-2. MATEMATIKA SMP/MTs:
-   - Elemen "Bilangan" | Sub-elemen "Bilangan Real":
-     Kompetensi: Bilangan bulat negatif/positif dengan hirarki PEMDAS ketat (termasuk aturan skor lomba +4, -1, 0 atau perubahan suhu); perbandingan senilai dan berbalik nilai (pekerja tambahan proyek terhenti, stok pakan); rasio dan skala peta bertingkat selisih jarak tempuh; bilangan berpangkat (eksponen), bentuk akar, notasi ilmiah.
-   - Elemen "Aljabar":
-     Sub-elemen "Persamaan dan Pertidaksamaan Linier" (PLSV, PtLSV, SPLDV tarif/tiket); Sub-elemen "Bentuk Aljabar" (operasi dan penyederhanaan aljabar); Sub-elemen "Fungsi" (relasi, domain, range, rumus f(x)); Sub-elemen "Barisan dan Deret" (barisan/deret aritmatika dan geometri berhingga kontekstual).
-   - Elemen "Geometri dan Pengukuran":
-     Sub-elemen "Objek Geometri" (sudut garis sejajar transversal, Teorema Pythagoras kontekstual, kesebangunan); Sub-elemen "Transformasi Geometri" (refleksi, translasi, rotasi, dilatasi); Sub-elemen "Pengukuran" (luas daerah berarsir lingkaran dan segi banyak, volume prisma/limas/bola).
-   - Elemen "Data dan Peluang":
-     Sub-elemen "Data" (mean gabungan saat ada data baru, median, kuartil, jangkauan); Sub-elemen "Peluang" (frekuensi relatif dan peluang kejadian tunggal).
-
-3. MATEMATIKA SMA/MA & SMK/MAK:
-   - Aljabar: SPLTV (sistem 3 variabel kontekstual), program linear optimasi, fungsi kuadrat/polinomial lanjutan, barisan-deret tak hingga/bunga majemuk.
-   - Geometri dan Pengukuran: Dimensi tiga jarak titik-garis-bidang, trigonometri kontekstual.
-   - Data dan Peluang: Statistika inferensial dasar, peluang kejadian majemuk, permutasi & kombinasi.
-
-PRINSIP KUALITAS SOAL (MUTLAK WAJIB DIPATUHI):
-1. ANTI-TRIVIAL & WAJIB MULTI-STEP REASONING (HOTS):
-   Dilarang keras membuat soal satu langkah sederhana (seperti sekadar menghitung x = a * b, atau konversi satuan langsung tanpa pemodelan). Setiap butir soal WAJIB menuntut minimal 2-3 langkah berpikir matematis/inferensial (misalnya: konversi satuan -> operasi campuran berbobot -> interpretasi sisa/kembalian; atau mencari harga satuan diskon -> menghitung kebutuhan uang; atau menghitung luas bangun total dikurangi bagian yang tidak diarsir).
-2. SINKRONISASI MUTLAK STIMULUS DENGAN BUTIR SOAL GRUP:
-   Untuk seluruh butir soal grup (jenis_soal: "grup"), soal WAJIB mengacu langsung pada entitas, tabel data, angka, atau alur cerita dalam stimulus yang dipasangkan. Dilarang keras membuat soal grup yang berdiri sendiri atau tidak berhubungan dengan teks/tabel stimulus!
-3. STIMULUS GANDA ANTARTEKS (KHUSUS BAHASA INDONESIA & BAHASA INGGRIS):
-   Matriks kompetensi resmi Pusmendik eksplisit menyebut kemampuan menyimpulkan/menilai informasi "dalam DAN/ATAU ANTARTEKS" — artinya sebagian stimulus WAJIB berupa DUA TEKS BERKAITAN yang dibandingkan, bukan hanya satu teks tunggal. Untuk kira-kira 1 dari setiap 3-4 stimulus grup Bahasa Indonesia/Bahasa Inggris dalam satu paket, buat objek stimulus (tipe: "teks") yang field "konten"-nya berisi DUA teks berdampingan dengan format:
-   "**Teks 1: [Judul Singkat]**\n[isi teks 1, sekitar separuh dari total budget kata jenjang]\n\n**Teks 2: [Judul Singkat]**\n[isi teks 2 dengan topik/sudut pandang terkait tapi berbeda dari Teks 1, panjang setara]"
-   Kedua teks harus membahas topik yang sama namun dari sudut pandang, fokus, atau tingkat kelengkapan informasi yang BERBEDA (misalnya dua ulasan tempat wisata dengan penekanan berbeda, dua sumber berita dengan detail berbeda, atau dua pendapat yang tidak sepenuhnya sejalan). Total kata KEDUA teks digabung tetap mengikuti batas kata jenjang pada tabel di atas. WAJIB minimal 1-2 butir soal dalam grup tersebut secara eksplisit meminta perbandingan ANTARTEKS (contoh pola pertanyaan: "Apa perbedaan informasi pada kedua teks tersebut?", "Pernyataan mana yang sesuai dengan Teks 1 tetapi TIDAK sesuai dengan Teks 2?", "Mengapa Teks 1 lebih [meyakinkan/detail/menarik] dibanding Teks 2?"). Stimulus grup lain yang tidak mendapat giliran pola ini tetap memakai SATU teks seperti biasa.
-4. DUKUNGAN REPRESENTASI VISUAL & TABEL DATA (DIAGRAM TEMPLATE & SVG MANDIRI):
-   - UNTUK EMPAT KATEGORI VISUAL BERIKUT, WAJIB GUNAKAN FORMAT TEMPLATE DIAGRAM (bukan svg_content tulisan bebas), karena perhitungan geometri presisinya (proporsi batang, sudut juring, lebar arsiran, skala garis bilangan) dilakukan otomatis oleh sistem berdasarkan angka yang Anda isi — bukan Anda hitung sendiri koordinat pikselnya:
-     a. Diagram batang data kategori: {"tipe": "diagram", "archetype": "diagram_batang", "data": {"judul": string?, "satuan_y": string?, "kategori": string[], "nilai": number[]}, "deskripsi_alt": "..."}
-     b. Diagram lingkaran/proporsi: {"tipe": "diagram", "archetype": "diagram_lingkaran", "data": {"judul": string?, "segmen": [{"label": string, "nilai": number}, ...]}, "deskripsi_alt": "..."}
-     c. Model visual arsiran pecahan: {"tipe": "diagram", "archetype": "model_pecahan", "data": {"bentuk": "lingkaran"|"persegi_panjang", "penyebut": number (1-12), "pembilang": number (0..penyebut), "label": string?}, "deskripsi_alt": "..."}
-     d. Garis bilangan: {"tipe": "diagram", "archetype": "garis_bilangan", "data": {"min": number, "max": number, "step": number?, "tanda": [{"nilai": number, "label": string?}, ...]?}, "deskripsi_alt": "..."}
-   - UNTUK SELAIN EMPAT KATEGORI DI ATAS (geometri bangun datar/ruang, denah, sudut, irisan/gabungan bidang, jaring-jaring, dan diagram proporsional lain yang tidak masuk kategori a-d): WAJIB LANGSUNG DIGAMBARKAN KODE SVG SECARA LENGKAP & MANDIRI pada field "gambar" dengan format: {"tipe": "svg", "svg_content": "<svg viewBox=\"0 0 480 300\" width=\"100%\" xmlns=\"http://www.w3.org/2000/svg\" ...>...</svg>", "deskripsi_alt": "..."}.
-   - DILARANG KERAS menggunakan status placeholder "perlu_ilustrasi". Seluruh ilustrasi visual yang dibutuhkan wajib langsung digambarkan lewat salah satu dari kedua format di atas dengan dimensi ukuran angka yang proporsional, rapi, dan jelas terbaca.
-   - Jika butir soal memang murni berbasis narasi/perhitungan aljabar tanpa perlu visual, isi field "gambar" dengan null.
-   - KUALITAS TEKNIS svg_content BEBAS (di luar 4 archetype template) WAJIB DIJAGA KETAT: seluruh koordinat elemen (x, y, cx, cy, titik path/polygon) WAJIB berada di dalam batas viewBox, DILARANG ada bagian gambar atau teks yang terpotong/keluar kanvas. Label teks antar-elemen DILARANG saling tumpang tindih atau bertabrakan dengan garis/bentuk lain — beri jarak yang cukup. Setiap tag pembuka elemen berpasangan (<g>, <text>, <tspan>) WAJIB memiliki tag penutup yang sesuai, jangan pernah membiarkan svg_content terpotong sebelum tag "</svg>" penutup. Untuk label angka/teks yang diposisikan di tengah suatu bentuk atau sumbu, WAJIB gunakan atribut text-anchor="middle" (dan dominant-baseline="middle" bila perlu).
-5. KONTEKS REALISTIS OTENTIK INDONESIA & ANTI-MONOTONI (LARANGAN KLISÉ):
-   - Gunakan konteks nyata Nusantara yang kaya dan bervariasi: kegiatan bazar/UMKM, resep kue tradisional proporsional, kalender jadwal latihan bersama dengan tanggal awal berbeda, denah rumah berskala, ketebalan dinding kayu wadah, pembagian bantuan posko bencana, sistem tarif parkir/transportasi bertingkat, penjualan kerajinan daerah, data energi panel surya sekolah, tiket penyeberangan kapal ferry, panen hidroponik, dll.
-   - DILARANG KERAS menggunakan nama klise yang monoton dan berulang seperti 'Maju Bersama', 'Maju Jaya', 'Makmur Bersama', atau tokoh yang selalu bernama 'Budi' dan 'Siti'!
-   - Wajib gunakan variasi nama entitas/lembaga/koperasi yang otentik dan bervariasi dari berbagai daerah di Nusantara (contoh: Koperasi Siswa Bhakti Karya, Koperasi Pelajar Bina Cendekia, Koperasi Harapan Bangsa, Koperasi Bahari Sentosa, Koperasi Dharma Warga, Kelompok Tani Subur Makmur, Kelompok Tani Tani Mukti, Toko Barokah, Toko Sentosa Abadi, dll.).
-   - Gunakan nama-nama tokoh yang beragam dari berbagai latar belakang budaya di Indonesia (misalnya: Wayan, Putu, Buyung, Ujang, Joko, Meiske, Frans, Butet, Alif, Zahra, Dimas, Nisa, Dayu, Tiur, Aris, Made, dsb.).
-   - LARANGAN PROFESI/PERAN TOKOH KLISE: DILARANG KERAS menjadikan 'arkeolog', 'teknisi menara BTS/pemancar', atau 'pilot/operator drone' sebagai profesi tokoh berulang kali dalam banyak soal — profesi-profesi ini sudah menjadi klise baru dan TIDAK merepresentasikan keseharian mayoritas masyarakat Indonesia seperti pola soal resmi Pusmendik (yang selalu memakai profesi membumi: petani, nelayan, pedagang pasar, penjual keliling, pengrajin, sopir, dst.). WAJIB rotasikan profesi tokoh dari daftar luas berikut (atau profesi membumi setara lainnya), JANGAN pernah memakai profesi yang sama lebih dari 2-3 kali dalam satu paket 30 soal: petani, nelayan, peternak, pedagang pasar/warung, penjual keliling, pengrajin (anyaman/tenun/ukir/gerabah), penjahit, tukang kayu/las/bangunan, sopir angkot/truk/ojek, montir, kurir/pengantar barang, guru, bidan/kader posyandu, petugas kebersihan, penjaga perpustakaan/koperasi sekolah, pemilik toko kelontong, peracik jamu, pemandu wisata lokal, petugas parkir, penambang tradisional, perajin batik/songket, pembudidaya ikan/udang, pekebun kopi/teh/cengkeh, penjaga toko roti/kue, tukang jahit, petugas kebun binatang, penyuluh pertanian.
-   - PENTING: tema konteks yang terdengar canggih/modern (drone, energi terbarukan, konservasi berteknologi, dst.) TIDAK MENGHARUSKAN tokoh utamanya berprofesi canggih pula — cukup jadikan teknologi itu sebagai LATAR/ALAT yang diamati atau digunakan oleh tokoh berprofesi membumi (mis. "Pak Wayan, petani kopi, melihat drone milik dinas pertanian memantau kebunnya" alih-alih "seorang pilot drone"). Kompleksitas tema ada pada DATA/ANGKA yang diuji, bukan pada status sosial/profesi tokohnya.
-   - KEWAJARAN ISTILAH KONTEKSTUAL — WAJIB DIPATUHI SEKETAT ATURAN LAINNYA: walau tema konteks terdengar teknis/ilmiah (konservasi alam, energi terbarukan, bioteknologi, teknologi digital, dsb.), istilah yang benar-benar dipakai dalam teks WAJIB tetap sesuai keakraban jenjang. DILARANG KERAS memakai nama ilmiah Latin genus/spesies (mis. "Rhizopus oligosporus", "Rhizophora mucronata") — ganti dengan nama umum Indonesia (mis. "kapang tempe", "pohon bakau"). DILARANG memakai akronim lembaga/institusi tanpa langsung menuliskan kepanjangannya saat pertama disebut (mis. jangan tulis "BBKSDA" begitu saja — tulis lengkap "Balai Besar Konservasi Sumber Daya Alam" atau ganti dengan sebutan umum "petugas konservasi"). Profesi/jabatan yang jarang dikenal (mis. "jagawana") WAJIB diberi penjelasan singkat saat pertama muncul atau diganti sebutan yang lebih umum ("penjaga hutan"). Tema yang menarik TIDAK BOLEH dijadikan alasan menaikkan beban kosakata di luar keakraban siswa jenjangnya — kompleksitas tetap harus ada pada PENALARAN, bukan pada ISTILAH yang asing.
-6. DISTRAKTOR BERBOBOT, VARIASI KUNCI PGK_MCMA, & PEMBAHASAN LENGKAP:
-   - VARIASI KUNCI PGK_MCMA: Pada butir soal PGK_MCMA (Pilihan Ganda Kompleks - Multi Jawaban), DILARANG KERAS membuat semua opsi selalu bernilai benar (4 kunci benar)! Jumlah kunci jawaban benar pada butir PGK_MCMA WAJIB bervariasi secara realistis di seluruh paket: ada butir dengan 1 opsi benar (3 distraktor salah), ada yang 2 opsi benar (2 salah), ada yang 3 opsi benar (1 salah), dan sesekali 4 opsi benar. Opsi yang salah wajib berupa distraktor meyakinkan yang mencerminkan miskonsepsi nyata siswa (seperti salah urutan operasi, lupa konversi satuan, atau salah rumus).
-   - Distraktor PG wajib mencerminkan miskonsepsi prosedural nyata siswa (seperti salah urutan operasi, lupa konversi satuan, atau lupa mengurangkan tebal dinding). Field "pembahasan" wajib menguraikan langkah pengerjaan secara sistematis, terstruktur bertingkat ke bawah per baris menggunakan karakter newline (\n) untuk setiap langkah atau analisis pernyataan (misalnya: Diketahui: ... \nLangkah 1 / Pernyataan 1: ... \nLangkah 2 / Pernyataan 2: ... \nSimpulan: ...). DILARANG menggabungkan seluruh rumus atau perhitungan matematika menjadi satu baris panjang tanpa jeda.
-7. NOTASI RUMUS MATEMATIKA:
-   Gunakan LaTeX inline $...$ atau display $$...$$. Di dalam JSON, SELALU escape backslash ganda (misal: \\\\frac{a}{b}, \\\\times, \\\\sqrt{x}, \\\\le, \\\\ge, \\\\text{...}).
-
-FORMAT KELUARAN — WAJIB, TIDAK BOLEH DILANGGAR:
-Kembalikan HANYA array JSON valid, tanpa teks penjelasan apa pun di luar JSON, tanpa markdown code fence.
-PENTING TENTANG TANDA PETIK: Di dalam seluruh nilai teks narasi (soal_text, pembahasan, stimulus, opsi), DILARANG KERAS menggunakan tanda petik ganda lurus (\") untuk percakapan/dialog, kutipan kata, atau nama bacaan! Wajib gunakan tanda petik tunggal ('...') atau petik kurung (“...”) agar sintaks JSON tidak rusak/terputus.
-Setiap elemen array adalah satu objek soal dengan field persis berikut:
-{
-  "jenjang": string, "mapel": string, "elemen": string, "sub_elemen": string,
-  "kompetensi": string, "level_kognitif": string, "tingkat_kesulitan": "rendah"|"sedang"|"tinggi",
-  "bentuk_soal": "PG"|"PGK_MCMA"|"PGK_KATEGORI", "jenis_soal": "tunggal"|"grup",
-  "stimulus_id_sementara": string|null,
-  "tema_konteks": string,
-  "soal_text": string,
-  "gambar": null | {"tipe": "svg", "svg_content": string, "deskripsi_alt": string} | {"tipe": "diagram", "archetype": "diagram_batang"|"diagram_lingkaran"|"model_pecahan"|"garis_bilangan", "data": object, "deskripsi_alt": string},
-  "opsi": [{"label": string, "text": string}] | null,
-  "pernyataan": [{"no": number, "text": string}] | null,
-  "kategori_respons": [string] | null,
-  "kunci_jawaban": [string],
-  "pembahasan": string
-}
-Untuk soal grup, beri nilai stimulus_id_sementara yang sama pada seluruh soal dalam satu grup (mis. "stim-1"), dan sertakan objek stimulus terpisah di awal array keluaran dengan bentuk: {"stimulus_id_sementara": string, "tipe": "teks"|"data", "konten": string}. Objek stimulus dan objek soal dibedakan lewat ada/tidaknya field "bentuk_soal".`;
 
 export interface StoredAiConfig {
   apiKey: string;
@@ -601,43 +473,14 @@ export function getCurriculumPromptContext(jenjang: string, mapel: string): stri
   const isMat = mapel.toLowerCase().includes("matematika");
   const isBin = mapel.toLowerCase().includes("indonesia") || mapel.toLowerCase().includes("inggris");
 
+  // Rincian kompetensi Matematika dikirim lewat rencana cakupan kompetensi, dan aturan wacana
+  // Bahasa lewat buildSystemPrompt — di sini hanya pengingat struktur paket yang ringkas.
   if (isMat) {
-    if (jenjang.includes("SD")) {
-      return `\nPANDUAN KURIKULUM & MATRIKS ASESMEN RESMI PUSMENDIK (SD/MI MATEMATIKA):
-- Elemen Bilangan (Sub: Bilangan Rasional): Pecahan senilai, perbandingan pecahan, relasi desimal/persen, operasi bilangan cacah multi-langkah, operasi pecahan dengan bilangan asli, KPK dan FPB berkonteks kalender/jadwal bersama bertanggal beda.
-- Elemen Geometri & Pengukuran (Sub: Objek Geometri & Pengukuran): Bangun datar gabungan, luas daerah berarsir, keliling jalan setapak, volume wadah balok berongga memperhitungkan ketebalan dinding kayu, konversi satuan baku volume/waktu/kecepatan.
-- Elemen Data (Sub: Penyajian dan Penggunaan Data): Tabel frekuensi Markdown, diagram batang, piktogram, penentuan rata-rata gabungan dan modus.
-- ATURAN STIMULUS GRUP: Buat minimal 1 stimulus grup berformat Tabel Markdown (| Kolom 1 | Kolom 2 |) yang terikat langsung pada tema terpilih (misal: data transaksi kantin/koperasi sekolah, data logistik posko bantuan, data panen/pertanian, jadwal transportasi antarpulau, atau rekapitulasi penjualan UMKM). DILARANG menggunakan nama klise berulang seperti 'Maju Bersama' atau selalu koperasi; variasikan nama toko/lembaga dan jenis aktivitasnya. Buat 2-3 butir soal grup (PG, PGK_MCMA, PGK_KATEGORI) yang 100% membaca data tabel tersebut.`;
-    } else if (jenjang.includes("SMP")) {
-      return `\nPANDUAN KURIKULUM & MATRIKS ASESMEN RESMI PUSMENDIK (SMP/MTs MATEMATIKA):
-- Elemen Bilangan (Sub: Bilangan Real): Operasi bilangan bulat bertanda (aturan penskoran lomba +4, -1, 0, kenaikan/penurunan suhu), rasio skala peta bertingkat selisih jarak tempuh, perbandingan berbalik nilai (pekerja tambahan proyek terhenti), eksponen, bentuk akar.
-- Elemen Aljabar: SPLDV (harga tiket, parkir bertingkat), PLSV/PtLSV kontekstual, bentuk aljabar, rumus fungsi f(x), barisan & deret aritmatika/geometri bertingkat.
-- Elemen Geometri & Pengukuran: Teorema Pythagoras kontekstual (jarak kapal/tiang), sudut garis transversal, luas daerah gabungan lingkaran dan segi banyak berarsir, volume prisma/limas/bola.
-- Elemen Data dan Peluang: Mean gabungan jika ada data baru masuk, diagram lingkaran, peluang kejadian tunggal.
-- ATURAN STIMULUS GRUP: Buat minimal 1 stimulus grup dengan tabel Markdown / data kompleks yang terikat langsung pada tema terpilih (bukan melulu koperasi sekolah, gunakan juga konteks sains, energi, rekap logistik, atau transportasi). DILARANG menggunakan nama klise berulang seperti 'Maju Bersama'. Disertai 2-3 soal grup yang 100% terikat pada stimulus.`;
-    } else {
-      return `\nPANDUAN KURIKULUM SMA/SMK MATEMATIKA:
-- Aljabar: SPLTV kontekstual 3 variabel, program linear optimasi fungsi objektif, fungsi kuadrat/polinomial lanjutan, barisan-deret bunga majemuk.
-- Geometri & Pengukuran: Dimensi tiga (jarak titik ke garis/bidang), trigonometri kontekstual sudut elevasi/depresi.
-- Data & Peluang: Statistika data kelompok, peluang kejadian majemuk saling lepas/bebas.
-- Sertakan stimulus grup dengan tabel/skenario analitis mendalam.`;
-    }
+    return `\nSTRUKTUR PAKET: sertakan 1–2 stimulus grup (tabel data, diagram, atau teks situasi), masing-masing dengan 2–3 butir soal yang benar-benar membaca stimulus tersebut. Butir lainnya berupa soal tunggal.`;
   }
 
   if (isBin) {
-    if (jenjang.includes("SD")) {
-      return `\nPANDUAN PUSMENDIK BAHASA INDONESIA (SD/MI):
-- Panjang wacana: ${formatWacanaCriteriaText("SD/MI")}.
-- Teks Informasi (fakta lokal/nasional) & Teks Fiksi anak (alur maju, latar konkret).
-- Ukur 3 kompetensi membaca: Pemahaman Tekstual, Pemahaman Inferensial, dan Evaluasi-Apresiasi.
-- Soal grup wajib merujuk secara mendalam pada teks stimulus.`;
-    } else {
-      return `\nPANDUAN PUSMENDIK BAHASA INDONESIA (SMP/MTs):
-- Panjang wacana: ${formatWacanaCriteriaText("SMP/MTs")}.
-- Teks Informasi (sains/lingkungan/teknologi) & Teks Fiksi (realisme/biografi sejarah).
-- Ukur 3 kompetensi membaca: Pemahaman Tekstual, Pemahaman Inferensial (hubungan kelogisan/sebab-akibat), dan Evaluasi-Apresiasi (keabsahan argumen, fakta vs opini).
-- Soal grup wajib merujuk secara mendalam pada teks stimulus.`;
-    }
+    return `\nSTRUKTUR PAKET: sebagian besar butir berupa soal grup (2–3 butir per stimulus). Panjang setiap teks: ${formatWacanaCriteriaText(jenjang)}. Wakili kedua taksonomi kompetensi (domestik dan PISA).`;
   }
 
   return "";
@@ -647,29 +490,12 @@ export function getStrictSvgPromptInstructions(jenjang: string, mapel: string): 
   const isMat = mapel.toLowerCase().includes("matematika");
   const isSd = jenjang.includes("SD");
 
-  return `\n\n=== ATURAN KETAT VISUALISASI SVG MANDIRI (STRICT SVG MODE AKTIF - WAJIB DIPATUHI) ===
-Paket soal ini WAJIB KAYA AKAN REPRESENTASI VISUAL! Dilarang membiarkan soal hanya berupa teks narasi jika dapat divisualisasikan.
-MINIMAL 6 SAMPAI 10 BUTIR SOAL DALAM PAKET INI WAJIB MEMILIKI FIELD "gambar" YANG BERISI KODE SVG MANDIRI LENGKAP:
-{"tipe": "svg", "svg_content": "<svg viewBox=\\"0 0 480 260\\" width=\\"100%\\" xmlns=\\"http://www.w3.org/2000/svg\\" ...>...</svg>", "deskripsi_alt": "..."}.
-
-ATURAN SPESIFIK VISUALISASI PER TOPIK:
-${isMat ? `1. DATA DAN PELUANG:
-   - WAJIB menyajikan stimulus data memakai FORMAT TEMPLATE {"tipe": "diagram", "archetype": "diagram_batang", ...} atau {"tipe": "diagram", "archetype": "diagram_lingkaran", ...} sesuai skema yang sudah dijelaskan di atas (DILARANG hanya tabel teks biasa, dan DILARANG menghitung sendiri koordinat batang/juringnya lewat svg_content bebas).
-2. GEOMETRI DAN PENGUKURAN:
-   - WAJIB menyertakan DIAGRAM BIDANG / BANGUN RUANG / DENAH SVG bebas (misalnya denah taman, irisan bangun, segitiga siku-siku Pythagoras, jaring-jaring bangun, bangun gabungan) lengkap dengan label dimensi (panjang, lebar, jari-jari, sudut) yang proporsional dan jelas.
-3. BILANGAN DAN PECAHAN:
-   ${isSd ? `- Pada soal pecahan, WAJIB menyertakan FORMAT TEMPLATE {"tipe": "diagram", "archetype": "model_pecahan", ...} (bentuk lingkaran kue/pizza atau persegi panjang berarsir) agar siswa SD dapat mengamati konsep pecahan secara visual konkret dan proporsi arsirannya presisi.
-   - Pada operasi hitung atau urutan bilangan bertanda, sertakan FORMAT TEMPLATE {"tipe": "diagram", "archetype": "garis_bilangan", ...} dengan titik-titik nilai.` : `- Pada perbandingan, rasio, atau operasi bertanda, sertakan FORMAT TEMPLATE {"tipe": "diagram", "archetype": "garis_bilangan", ...} atau {"tipe": "diagram", "archetype": "diagram_batang", ...} untuk rasio.`}` : `1. WACANA INFORMASI & DATA:
-   - Pada butir soal berbasis wacana informasi/fakta yang memuat proporsi/persentase, gunakan FORMAT TEMPLATE {"tipe": "diagram", "archetype": "diagram_lingkaran", ...}; untuk kartu infografik ringkas lain gunakan svg_content bebas (kotak kartu dengan ikon SVG sederhana, sorotan angka fakta).
-2. TEKS PETUNJUK / PROSEDUR:
-   - Sertakan DIAGRAM ALUR / BAGAN LANGKAH KERJA SVG bebas yang menarik dan mudah dipahami siswa.`}
-
-STANDAR TEKNIS KUALITAS SVG:
-- Gunakan viewBox="0 0 480 260" dengan lebar responsive width="100%".
-- Padukan warna modern dan ramah mata (indigo #4f46e5, emerald #059669, amber #d97706, slate #475569, background halus #f8fafc).
-- Gunakan font-family="system-ui, sans-serif" dengan font-size minimal 12-14 agar teks angka dan label terbaca tajam di layar handphone dan komputer siswa.
-- DILARANG KERAS mengembalikan status placeholder "perlu_ilustrasi". Seluruh visualisasi wajib berupa kode SVG mandiri yang valid dan langsung render!
-- Seluruh elemen (bentuk maupun teks) WAJIB berada penuh di dalam batas viewBox, tidak ada yang terpotong di tepi kanvas. Beri jarak antar-label agar tidak saling tumpang tindih. Gunakan text-anchor="middle" untuk label yang mengacu ke tengah sebuah objek/sumbu. Pastikan setiap tag <g>/<text>/<tspan> yang dibuka selalu ditutup, dan svg_content tidak boleh terpotong sebelum tag "</svg>" akhir.`;
+  return `\n\nMODE VISUAL KETAT AKTIF: sekitar sepertiga butir dalam batch ini wajib memiliki "gambar" (tidak null), mengikuti aturan ILUSTRASI di atas.
+${isMat ? `- Data dan peluang: sajikan data dengan template diagram_batang atau diagram_lingkaran (tabel Markdown boleh sebagai pelengkap).
+- Geometri dan pengukuran: SVG bangun datar/ruang, denah, atau jaring-jaring dengan label ukuran yang proporsional.
+- Bilangan: ${isSd ? "template model_pecahan (lingkaran atau persegi panjang berarsir) untuk pecahan, dan garis_bilangan untuk urutan atau operasi bilangan." : "template garis_bilangan untuk bilangan bertanda atau urutan bilangan."}` : `- Teks informasi yang memuat persentase atau perbandingan: template diagram_lingkaran atau diagram_batang.
+- Teks prosedur: SVG bagan alur langkah kerja yang sederhana.`}
+- SVG memakai viewBox="0 0 480 300", width="100%", font-family="system-ui, sans-serif", ukuran huruf minimal 12, dan warna yang ramah mata (mis. #4f46e5, #059669, #d97706, #475569, latar #f8fafc).`;
 }
 
 // SYSTEM PROMPT UNTUK PERBAIKAN SATU BUTIR SOAL BERDASARKAN CATATAN VALIDATOR
@@ -680,7 +506,7 @@ ATURAN WAJIB:
 2. Jika catatan meminta redaksi ulang pertanyaan, opsi, atau pembahasan, tulis ulang secara utuh dan konsisten — jangan setengah-setengah atau menyisakan bagian lama yang kontradiktif dengan bagian baru.
 3. Jika catatan menyebutkan hasil perhitungan tidak bulat/tidak rapi, PILIH SALAH SATU: sesuaikan angka pada soal, ATAU ubah redaksi pertanyaan (misalnya menjadi "tambahan/kekurangan minimal") agar tetap valid secara matematis dan kunci jawabannya benar-benar cocok dengan salah satu opsi yang ada (jangan menghasilkan kunci yang tidak ada di daftar opsi).
 4. Field "pembahasan" WAJIB diuraikan bertingkat ke bawah per baris memakai karakter newline (\\n) untuk tiap langkah (contoh: "Diketahui: ...\\nLangkah 1: ...\\nLangkah 2: ...\\nSimpulan: ..."), jelas dan langsung ke inti. DILARANG memakai gaya bahasa yang terasa seperti keluaran AI generik (hindari frasa seperti "Tentu, berikut adalah...", "Sebagai AI...", "Baik, saya akan...", dsb) — tulis sebagaimana pendidik manusia menulis kunci pembahasan.
-5. Notasi matematika memakai LaTeX inline $...$ atau display $$...$$; di dalam JSON, escape backslash ganda (\\\\frac, \\\\times, \\\\sqrt, dst). PASTIKAN setiap tanda '$' dan '$$' selalu berpasangan lengkap dan ditutup dengan benar (jumlah tanda '$' dan '$$' harus selalu genap, dilarang meninggalkan tanda pembuka tanpa penutup).
+5. Notasi matematika memakai LaTeX; di dalam JSON, escape backslash ganda (\\\\frac, \\\\times, \\\\sqrt, dst). Satu persamaan utuh berada di dalam SATU pasangan $...$, sedangkan kata penjelas dan satuan ditulis di luar tanda $ (contoh benar: Total = $140 + 180 = 320$ kg; contoh salah: $Total $= 140 + 180 = 320$ kg$). Perhitungan panjang boleh ditulis pada baris sendiri sebagai $$...$$.
 6. Field "gambar": jika catatan validator meminta ganti soal/tema total, atau jika soal baru tidak lagi berhubungan dengan gambar lama, WAJIB buat ilustrasi SVG baru yang sesuai dengan topik baru atau kembalikan "gambar": null (DILARANG mempertahankan gambar lama yang tidak relevan). Jika catatan validator TIDAK menyinggung ilustrasi dan topik soal tetap sama, kembalikan "gambar": null (sistem akan mempertahankan ilustrasi asli). Jika catatan validator secara eksplisit meminta perbaikan visual, sertakan revisi "gambar" mengikuti salah satu format: {"tipe": "svg", "svg_content": "<svg viewBox=\\"0 0 480 300\\" width=\\"100%\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>", "deskripsi_alt": "..."} untuk geometri/denah bebas, atau {"tipe": "diagram", "archetype": "diagram_batang"|"diagram_lingkaran"|"model_pecahan"|"garis_bilangan", "data": {...}, "deskripsi_alt": "..."} untuk diagram data/pecahan/garis bilangan (parameter data mengikuti skema masing-masing archetype).
 7. PADA SOAL BENTUK PGK_MCMA (Pilihan Ganda Kompleks Multi-Jawaban):
    - DILARANG membuat semua opsi bernilai benar (semua opsi benar adalah cacat desain soal asesmen).
@@ -869,6 +695,13 @@ export interface GenerationResult {
   nanoBananaFallback?: number;
 }
 
+async function saveGenerationLog(values: typeof generationLogs.$inferInsert) {
+  await db
+    .insert(generationLogs)
+    .values(values)
+    .onConflictDoUpdate({ target: generationLogs.id, set: values });
+}
+
 /**
  * Core Engine Pembuatan Soal Otomatis Berbasis Google Gemini API
  */
@@ -880,6 +713,29 @@ export async function generateBatchQuestions(options: GenerateOptions): Promise<
   const { mapel, configId, adminId, triggeredBy, forceMock } = options;
   const jenjang = normalizeJenjang(options.jenjang);
   const storedConfig = await getStoredAiConfig();
+
+  // Log "berjalan" ditulis di awal dan ditimpa di setiap jalur keluar. Jika fungsi serverless
+  // terputus karena batas durasi, log ini tetap tertinggal sebagai jejak — sebelumnya proses
+  // yang terputus tidak meninggalkan catatan apa pun.
+  await saveGenerationLog({
+    id: logId,
+    configId: configId || null,
+    jenjang,
+    mapel,
+    packageId: null,
+    packageCode: null,
+    status: "berjalan",
+    totalDiminta: options.totalSoal && options.totalSoal > 0 ? options.totalSoal : 30,
+    totalDiterima: 0,
+    totalLolos: 0,
+    totalGagal: 0,
+    detailPemeriksaan: [],
+    errorMessage: null,
+    triggeredBy,
+    adminId: adminId || null,
+    startedAt,
+    completedAt: null,
+  });
 
   const apiKey = options.apiKey?.trim() || storedConfig.apiKey;
   const modelName = options.modelName?.trim() || storedConfig.modelName;
@@ -919,15 +775,9 @@ export async function generateBatchQuestions(options: GenerateOptions): Promise<
     const pickedThemes = shuffled.slice(0, Math.min(5, shuffled.length));
 
     themeName = `Multi-Tema Tryout Nasional (${pickedThemes.map((t) => t.namaTema).join(", ")})`;
-    dynamicContextBlock = `\n\nVARIASI MULTI-TEMA NUSANTARA (STANDAR TRYOUT NASIONAL AYOTKA.ID) — WAJIB DIPATUHI:
-Paket soal ini dirancang khusus untuk simulasi Tryout Nasional skala nasional sehingga WAJIB memadukan berbagai tema dan sub-konteks nusantara agar kaya konteks dan berimbang lintas 30 butir soal (JANGAN memakai 1 tema saja untuk seluruh paket):
-${pickedThemes.map((t, idx) => `Tema ${idx + 1} [${t.namaTema}]:\n  Contoh Sub-konteks: ${(t.subKonteks || []).join(", ")}`).join("\n")}
-
-ATURAN DISTRIBUSI MULTI-TEMA:
-- Distribusikan tema-tema di atas secara seimbang dan berotasi ke seluruh 30 butir soal (misal tiap tema mendapat 5-6 butir soal).
-- Tiap grup stimulus dan butir soal mandiri harus menggunakan sub-konteks yang berbeda agar kontekstual, menarik, dan tidak monoton.
-- Tema ini HANYA bungkus cerita/konteks — konten yang diuji tetap harus elemen dan kompetensi kurikulum ${jenjang} ${mapel}.
-- Setiap soal wajib menyertakan field "tema_konteks": string (2-5 kata ringkasan spesifik konteks soal, misal 'atap Tongkonan Toraja', 'konservasi terumbu karang', 'bazar kerajinan tenun').`;
+    dynamicContextBlock = `\n\nINSPIRASI TEMA KONTEKS (tidak wajib untuk setiap butir):
+${pickedThemes.map((t, idx) => `${idx + 1}. ${t.namaTema} — contoh sub-konteks: ${(t.subKonteks || []).join(", ")}`).join("\n")}
+Pakai tema-tema ini sebagai sumber ide latar untuk sebagian soal jika cocok dengan kompetensi yang diuji; butir lain boleh memakai situasi keseharian siswa yang lain. Jangan memaksakan tema ke soal yang tidak cocok, dan jangan menumpuk satu tema di terlalu banyak butir. Tema hanya latar cerita — yang diuji tetap kompetensi ${mapel} jenjang ${jenjang}.`;
 
   } else if (options.selectedThemes && options.selectedThemes.length > 0) {
     // Pengguna memilih 1 atau lebih tema dari Pool Tema Konteks (29 Tema)
@@ -935,28 +785,18 @@ ATURAN DISTRIBUSI MULTI-TEMA:
       const st = options.selectedThemes[0];
       themeName = st.namaTema;
       subKonteksList = st.subKonteks && st.subKonteks.length > 0 ? st.subKonteks : [st.namaTema];
-      dynamicContextBlock = `\n\nVARIASI KONTEKS — WAJIB DIPATUHI:
-Tema konteks untuk batch soal ini adalah: ${themeName}.
-Gunakan sub-konteks berikut secara bergantian dan bervariasi, jangan memakai sub-konteks yang sama lebih dari 4 kali dalam 30 soal ini:
+      dynamicContextBlock = `\n\nTEMA PILIHAN ADMIN: ${themeName}.
+Gunakan tema ini sebagai latar utama paket dengan sub-konteks yang bervariasi (boleh dikembangkan):
 ${subKonteksList.map((s, idx) => `${idx + 1}. ${s}`).join("\n")}
-Anda boleh membuat variasi/pengembangan baru dari sub-konteks di atas, selama masih dalam tema ${themeName}.
-Tema ini HANYA bungkus cerita/konteks — konten yang diuji tetap harus elemen dan kompetensi kurikulum ${jenjang} ${mapel}.
-Sesuaikan kedalaman istilah dengan jenjang: untuk SD/MI gunakan istilah konkret sederhana, untuk SMP/MTs ke atas boleh analitis bertingkat.
-Untuk tiap soal, sertakan field "tema_konteks": string (2-5 kata ringkasan spesifik konteks butir soal ini).`;
+Situasi tetap harus wajar dan mudah dibayangkan siswa jenjang ${jenjang}, dengan istilah yang mereka kenal. Tema hanya latar cerita — yang diuji tetap kompetensi ${mapel}.`;
     } else {
       // Lebih dari 1 tema dipilih dari Pool
       themeName = options.selectedThemes.map((t) => t.namaTema).join(", ");
-      dynamicContextBlock = `\n\nVARIASI MULTI-TEMA PILIHAN ADMIN (STANDAR TRYOUT NASIONAL AYOTKA.ID) — WAJIB DIPATUHI:
-Paket soal ini dirancang dengan ${options.selectedThemes.length} tema pilihan dari Pool Tema Konteks yang WAJIB dipadukan secara seimbang ke dalam 30 butir soal:
+      dynamicContextBlock = `\n\nTEMA PILIHAN ADMIN (${options.selectedThemes.length} tema, bagikan secara seimbang ke butir-butir soal):
 ${options.selectedThemes
-  .map((t, idx) => `Tema ${idx + 1} [${t.namaTema}]:\n  Sub-konteks: ${(t.subKonteks || []).join(", ")}`)
+  .map((t, idx) => `${idx + 1}. ${t.namaTema} — sub-konteks: ${(t.subKonteks || []).join(", ")}`)
   .join("\n")}
-
-ATURAN DISTRIBUSI MULTI-TEMA:
-- Distribusikan tema-tema pilihan di atas secara proporsional ke butir-butir soal.
-- Tiap grup stimulus dan butir soal tunggal harus menggunakan sub-konteks yang berbeda agar kontekstual dan tidak monoton.
-- Tema ini HANYA bungkus cerita/konteks — konten yang diuji tetap harus elemen dan kompetensi kurikulum ${jenjang} ${mapel}.
-- Setiap butir soal wajib menyertakan field "tema_konteks": string (2-5 kata ringkasan konteks).`;
+Situasi tetap harus wajar dan mudah dibayangkan siswa jenjang ${jenjang}, dengan istilah yang mereka kenal. Tema hanya latar cerita — yang diuji tetap kompetensi ${mapel}.`;
     }
   } else {
     // Mode Default: Dynamic theme selector berdasarkan riwayat 4 hari
@@ -969,48 +809,32 @@ ATURAN DISTRIBUSI MULTI-TEMA:
       ? [options.customInstruction.trim(), ...dynamicTheme.subKonteks]
       : dynamicTheme.subKonteks;
 
-    dynamicContextBlock = `\n\nVARIASI KONTEKS — WAJIB DIPATUHI:
-Tema konteks untuk batch soal ini adalah: ${themeName}.
-Gunakan sub-konteks berikut secara bergantian, jangan memakai sub-konteks yang sama lebih dari 4 kali dalam 30 soal ini:
-${subKonteksList.map((s, idx) => `${idx + 1}. ${s}`).join("\n")}
-Anda boleh membuat variasi/pengembangan baru dari sub-konteks di atas (bukan hanya mengulang persis), selama masih dalam tema ${themeName}.
-
-Tema ini HANYA bungkus cerita/konteks — konten yang diuji tetap harus elemen dan kompetensi kurikulum sesuai kisi-kisi (jangan sampai soal berubah jadi menguji pengetahuan tentang tema itu sendiri, bukan menguji Matematika/Bahasa). Sesuaikan kedalaman istilah dengan jenjang: untuk SD/MI gunakan istilah sederhana dan situasi konkret dari tema ini, sementara untuk SMP/MTs dan SMA/MA boleh memakai istilah yang lebih teknis dan analitis dari tema ini selama tetap dipahami tanpa pengetahuan khusus di luar konteks yang diberikan dalam soal.
-
-Untuk tiap soal, sertakan juga field "tema_konteks": string (2-5 kata, ringkasan spesifik konteks soal ini).`;
+    dynamicContextBlock = `\n\nINSPIRASI TEMA KONTEKS (tidak wajib untuk setiap butir): ${themeName} — contoh sub-konteks: ${subKonteksList.join(", ")}.
+Pakai tema ini sebagai sumber ide latar untuk sebagian soal jika cocok dengan kompetensi yang diuji; butir lain boleh memakai situasi keseharian siswa yang lain. Jangan memaksakan tema ke soal yang tidak cocok. Tema hanya latar cerita — yang diuji tetap kompetensi ${mapel} jenjang ${jenjang}.`;
   }
 
   // Lapis 1: Dynamic Negative Memory (Sliding Window 90 butir soal terakhir dari DB)
   const recentMemory = await fetchRecentQuestionsMemory(jenjang, mapel, 90);
 
-  // Lapis 2 & 3: Penetapan Deterministik Arketipe & Matriks Kombinatorika Dinamis
-  const deterministicSlotPlans = generateDeterministicSlotPlan(
+  const competencySlotPlans = generateCompetencySlotPlan(
     totalDiminta,
     jenjang,
     mapel,
     options.selectedElements
   );
-  const archetypePromptBlock = formatArchetypeGuidancePrompt(
-    deterministicSlotPlans,
-    jenjang,
-    mapel
-  );
+  const competencyPlanBlock = formatCompetencyPlanPrompt(competencySlotPlans);
 
   const isStrictSvg = typeof options.strictSvgMode === "boolean" ? options.strictSvgMode : !!storedConfig.strictSvgMode;
   const strictSvgBlock = isStrictSvg ? getStrictSvgPromptInstructions(jenjang, mapel) : "";
 
-  const activeSystemPrompt = `${BSKAP_SYSTEM_PROMPT}${dynamicContextBlock}${strictSvgBlock}${recentMemory.promptBlock}`;
+  const activeSystemPrompt = `${buildSystemPrompt(jenjang, mapel)}${dynamicContextBlock}${strictSvgBlock}${recentMemory.promptBlock}`;
 
   // Prompt Pengguna Target Distribusi
   let userPrompt = `Hasilkan tepat ${totalDiminta} butir soal TKA berkualitas tinggi dengan distribusi bentuk soal sekitar ${distB.PG} PG, ${distB.PGK_MCMA} PGK_MCMA, ${distB.PGK_KATEGORI} PGK_KATEGORI, dan distribusi tingkat kesulitan sekitar ${distK.rendah} rendah, ${distK.sedang} sedang, ${distK.tinggi} tinggi untuk jenjang ${jenjang} dan mata pelajaran ${mapel}.
 
-Wajib menuntut penalaran bertingkat (multi-step HOTS), menggunakan konteks nyata Indonesia, menyertakan data tabel Markdown untuk stimulus grup, dan memastikan butir soal grup 100% mengacu pada stimulus.
+Ikuti gaya soal dan contoh acuan pada instruksi sistem, dan sesuaikan banyak langkah berpikir dengan tingkat kesulitan tiap butir.
 ${curriculumGuidance}
-${archetypePromptBlock}`;
-
-  if (isStrictSvg) {
-    userPrompt += `\n\nCATATAN KHUSUS VISUALISASI SVG: Mode Visualisasi SVG Ketat sedang aktif. Pastikan minimal 6-10 butir soal (khususnya data/diagram, geometri/denah, dan model pecahan arsiran) menyertakan kode SVG mandiri yang lengkap dan valid pada field "gambar".`;
-  }
+${competencyPlanBlock}`;
 
   // Pembatasan Elemen Materi jika dipilih sebagian oleh admin
   let elementRestrictionPrompt = "";
@@ -1037,7 +861,7 @@ DILARANG KERAS membuat soal di luar elemen materi di atas! Seluruh butir soal ($
       const completedAt = new Date();
       const errMsg = "GEMINI_API_KEY belum dikonfigurasi di file .env server maupun di form Pengaturan Admin.";
 
-      await db.insert(generationLogs).values({
+      await saveGenerationLog({
         id: logId,
         configId: configId || null,
         jenjang,
@@ -1073,17 +897,30 @@ DILARANG KERAS membuat soal di luar elemen materi di atas! Seluruh butir soal ($
       };
     }
 
-    try {
-      if (totalDiminta <= 15) {
-        // Batch kecil (<= 15 butir): panggil sekali secara langsung
+    // Respons yang JSON-nya rusak (mis. terpotong atau tanda petik tidak di-escape) diminta
+    // ulang sekali; kegagalan HTTP sudah ditangani callGeminiResilient sehingga langsung dilempar.
+    const callAndParse = async (prompt: string): Promise<any[]> => {
+      for (let attempt = 1; ; attempt++) {
         const res = await callGeminiResilient({
           apiKey,
           preferredModel: modelName,
           systemInstruction: activeSystemPrompt,
-          userPrompt,
+          userPrompt: prompt,
           temperature,
         });
-        parsedArray = parseGeminiJson(res.rawText);
+        try {
+          return parseGeminiJson(res.rawText);
+        } catch (parseErr) {
+          if (attempt >= 2) throw parseErr;
+          console.warn("[Generate] Respons JSON dari model tidak valid, meminta ulang sekali.");
+        }
+      }
+    };
+
+    try {
+      if (totalDiminta <= 15) {
+        // Batch kecil (<= 15 butir): panggil sekali secara langsung
+        parsedArray = await callAndParse(userPrompt);
       } else {
         // Batch besar (16 - 30 butir): bagi menjadi 2 sub-batch untuk stabilitas tinggi,
         // mencegah token cutoff, dan menghindari 503 high demand spike di server Google
@@ -1114,14 +951,14 @@ DILARANG KERAS membuat soal di luar elemen materi di atas! Seluruh butir soal ($
 
         let p1 = `Hasilkan tepat ${chunk1Count} butir soal TKA berkualitas tinggi (bagian 1 dari 2) dengan distribusi bentuk soal sekitar ${distB1.PG} PG, ${distB1.PGK_MCMA} PGK_MCMA, ${distB1.PGK_KATEGORI} PGK_KATEGORI, dan distribusi tingkat kesulitan sekitar ${distK1.rendah} rendah, ${distK1.sedang} sedang, ${distK1.tinggi} tinggi untuk jenjang ${jenjang} dan mata pelajaran ${mapel}.
 
-Wajib penalaran bertingkat (multi-step HOTS), konteks nyata, tabel Markdown untuk stimulus grup, dan kohesi penuh.
+Ikuti gaya soal dan contoh acuan pada instruksi sistem, dan sesuaikan banyak langkah berpikir dengan tingkat kesulitan tiap butir.
 ${curriculumGuidance}
-${formatArchetypeGuidancePrompt(deterministicSlotPlans.slice(0, chunk1Count), jenjang, mapel)}`;
+${formatCompetencyPlanPrompt(competencySlotPlans.slice(0, chunk1Count))}`;
         let p2 = `Hasilkan tepat ${chunk2Count} butir soal TKA berkualitas tinggi (bagian 2 dari 2) dengan distribusi bentuk soal sekitar ${distB2.PG} PG, ${distB2.PGK_MCMA} PGK_MCMA, ${distB2.PGK_KATEGORI} PGK_KATEGORI, dan distribusi tingkat kesulitan sekitar ${distK2.rendah} rendah, ${distK2.sedang} sedang, ${distK2.tinggi} tinggi untuk jenjang ${jenjang} dan mata pelajaran ${mapel}.
 
-Wajib penalaran bertingkat (multi-step HOTS), konteks nyata, tabel Markdown untuk stimulus grup, dan kohesi penuh.
+Ikuti gaya soal dan contoh acuan pada instruksi sistem, dan sesuaikan banyak langkah berpikir dengan tingkat kesulitan tiap butir.
 ${curriculumGuidance}
-${formatArchetypeGuidancePrompt(deterministicSlotPlans.slice(chunk1Count), jenjang, mapel)}`;
+${formatCompetencyPlanPrompt(competencySlotPlans.slice(chunk1Count))}`;
 
         if (elementRestrictionPrompt) {
           p1 += elementRestrictionPrompt;
@@ -1133,24 +970,23 @@ ${formatArchetypeGuidancePrompt(deterministicSlotPlans.slice(chunk1Count), jenja
           p2 += `\n\nFokus/Instruksi konteks tambahan: ${options.customInstruction.trim()}`;
         }
 
-        const res1 = await callGeminiResilient({
-          apiKey,
-          preferredModel: modelName,
-          systemInstruction: activeSystemPrompt,
-          userPrompt: p1,
-          temperature,
-        });
-
-        const res2 = await callGeminiResilient({
-          apiKey,
-          preferredModel: modelName,
-          systemInstruction: activeSystemPrompt,
-          userPrompt: p2,
-          temperature,
-        });
-
-        const arr1 = parseGeminiJson(res1.rawText);
-        const arr2 = parseGeminiJson(res2.rawText);
+        // Jika salah satu bagian gagal, hasil bagian lain tetap dipakai dan kekurangannya diisi
+        // oleh mekanisme regenerasi — sebelumnya satu bagian gagal membuang seluruh paket.
+        let arr1: any[] = [];
+        let arr2: any[] = [];
+        let chunkError: any = null;
+        try {
+          arr1 = await callAndParse(p1);
+        } catch (err) {
+          chunkError = err;
+          console.warn("[Generate] Bagian 1 gagal, melanjutkan dengan bagian 2:", (err as Error).message);
+        }
+        try {
+          arr2 = await callAndParse(p2);
+        } catch (err) {
+          if (chunkError) throw chunkError;
+          console.warn("[Generate] Bagian 2 gagal, melanjutkan dengan bagian 1:", (err as Error).message);
+        }
 
         // Hindari tabrakan ID stimulus sementara antarsub-batch
         arr2.forEach((item: any) => {
@@ -1165,7 +1001,7 @@ ${formatArchetypeGuidancePrompt(deterministicSlotPlans.slice(chunk1Count), jenja
       const completedAt = new Date();
       const errMsg = `Kegagalan pemanggilan model Gemini API (${modelName}): ${apiError.message}`;
 
-      await db.insert(generationLogs).values({
+      await saveGenerationLog({
         id: logId,
         configId: configId || null,
         jenjang,
@@ -1526,19 +1362,18 @@ ${formatArchetypeGuidancePrompt(deterministicSlotPlans.slice(chunk1Count), jenja
     const missingCount = totalDiminta - validQuestions.length;
     console.log(`[Regenerasi AI BSKAP] Percobaan ke-${retryAttempts}: Mengajukan ${missingCount} butir pengganti untuk melengkapi kuota ${totalDiminta}.`);
 
-    const specificRejectionReasons = Object.values(rejectedStimuli)
-      .flatMap((r) => r.reasons)
-      .slice(0, 8);
+    // Alasan per butir (bukan hanya stimulus) diteruskan agar model tahu persis apa yang harus
+    // dihindari; id sementara dinormalisasi supaya alasan yang sama tidak terulang di daftar.
+    const rejectionReasons = [
+      ...Object.values(rejectedStimuli).flatMap((r) => r.reasons),
+      ...failedItems.map((f) => f.reason),
+    ];
+    const distinctReasons = [
+      ...new Set(rejectionReasons.map((r) => r.replace(/"[^"]*"/g, '"…"').slice(0, 220))),
+    ].slice(0, 8);
 
-    let retryUserPrompt = `PERHATIAN REGENERASI BSKAP: Pada pengiriman sebelumnya, terdapat butir/stimulus yang DITOLAK gerbang kualitas karena melanggar ketentuan resmi.
-Hasilkan tepat ${missingCount} butir soal pengganti berkualitas tinggi untuk jenjang ${jenjang} dan mata pelajaran ${mapel}.
-
-${isLanguageSubject(mapel) ? `WAJIB DIPATUHI SECARA KETAT SESUAI PERKABAN BSKAP:
-- Jika menyertakan stimulus teks wacana baru, panjang teks WAJIB tepat dalam rentang resmi jenjang ${jenjang}: ${formatWacanaCriteriaText(jenjang)}.
-- DILARANG melebihi atau mengurangi batas tersebut. Teks yang tidak memenuhi batas akan langsung ditolak sistem.
-- HITUNG SENDIRI jumlah kata total dan rata-rata kata/kalimat teksmu sebelum menjawab; revisi dulu jika di luar rentang.
-${specificRejectionReasons.length > 0 ? `\nALASAN PERSIS penolakan pada pengiriman sebelumnya (JANGAN ulangi kesalahan yang sama):\n${specificRejectionReasons.map((r) => `- ${r}`).join("\n")}` : ""}` : ''}
-
+    let retryUserPrompt = `Sebagian butir pada pengiriman sebelumnya ditolak pemeriksaan otomatis. Hasilkan tepat ${missingCount} butir soal pengganti untuk jenjang ${jenjang} dan mata pelajaran ${mapel}, mengikuti gaya soal dan contoh acuan pada instruksi sistem.
+${distinctReasons.length > 0 ? `\nAlasan penolakan sebelumnya (jangan diulang):\n${distinctReasons.map((r) => `- ${r}`).join("\n")}\n` : ""}${isLanguageSubject(mapel) ? `\nSetiap teks stimulus baru wajib ${formatWacanaCriteriaText(jenjang)}; hitung sendiri sebelum menjawab.\n` : ""}
 ${curriculumGuidance}`;
 
     if (elementRestrictionPrompt) {
@@ -1758,7 +1593,7 @@ ${curriculumGuidance}`;
     const completedAt = new Date();
     const errMsg = `Seluruh butir soal (${questionObjects.length}) gagal dalam gerbang pemeriksaan otomatis.`;
 
-    await db.insert(generationLogs).values({
+    await saveGenerationLog({
       id: logId,
       configId: configId || null,
       jenjang,
@@ -1846,22 +1681,6 @@ ${curriculumGuidance}`;
 
   const packageStatus = validQuestions.length === totalDiminta ? "dalam_validasi" : "draft";
 
-  await db.insert(questionPackages).values({
-    id: packageId,
-    code: packageCode,
-    nama: packageNama,
-    jenjang: jenjang as any,
-    mapel,
-    tipeSumber: "ai",
-    authorId: adminId || "usr-admin-001",
-    jumlahSoal: totalDiminta,
-    distribusiBentukSoal: actualDistBentuk,
-    distribusiKesulitan: actualDistKesulitan,
-    status: packageStatus,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-
   // 7B. Konversi Ilustrasi Kontekstual Nano Banana Pro (opsional, hanya utk gambar.tipe === "svg")
   // Berlaku sama untuk Trigger Manual maupun Jadwal Cron Otomatis Pagi karena beroperasi di sini,
   // setelah seluruh soal lolos gerbang validasi dan SEBELUM disimpan ke database.
@@ -1933,7 +1752,25 @@ ${curriculumGuidance}`;
         ]
       : [];
 
-  // 8. Simpan Seluruh Butir Soal Valid ke Database
+  // 8. Simpan paket + seluruh butir soal valid. Paket sengaja baru dibuat SETELAH langkah
+  // Nano Banana yang lambat: bila fungsi serverless terputus (batas durasi Vercel) di tengah
+  // pembuatan ilustrasi, tidak ada lagi paket kosong 0/30 yang tertinggal tanpa soal.
+  await db.insert(questionPackages).values({
+    id: packageId,
+    code: packageCode,
+    nama: packageNama,
+    jenjang: jenjang as any,
+    mapel,
+    tipeSumber: "ai",
+    authorId: adminId || "usr-admin-001",
+    jumlahSoal: totalDiminta,
+    distribusiBentukSoal: actualDistBentuk,
+    distribusiKesulitan: actualDistKesulitan,
+    status: packageStatus,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
   for (let i = 0; i < validQuestions.length; i++) {
     const vq = validQuestions[i];
     const slotNumber = i + 1;
@@ -1941,7 +1778,7 @@ ${curriculumGuidance}`;
     const questionId = `soal-ai-${Date.now()}-${slotNumber}-${Math.random().toString(36).substring(2, 6)}`;
 
     const checkSim = checkQuestionSimilarity(vq.soal_text, recentMemory.rawStems, 60);
-    const assignedArchetype = deterministicSlotPlans[i]?.archetype?.nama || null;
+    const assignedArchetype = competencySlotPlans[i]?.fokus || null;
 
     const payload = {
       soal_text: vq.soal_text,
@@ -1991,7 +1828,7 @@ ${curriculumGuidance}`;
   const overallStatus = validQuestions.length === totalDiminta ? "berhasil" : "sebagian";
   const completedAt = new Date();
 
-  await db.insert(generationLogs).values({
+  await saveGenerationLog({
     id: logId,
     configId: configId || null,
     jenjang,

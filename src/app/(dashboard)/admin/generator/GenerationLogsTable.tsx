@@ -66,7 +66,7 @@ export interface GenerationLogItem {
   mapel: string;
   packageId: string | null;
   packageCode: string | null;
-  status: "berhasil" | "gagal" | "sebagian";
+  status: "berhasil" | "gagal" | "sebagian" | "berjalan";
   totalDiminta: number;
   totalDiterima: number;
   totalLolos: number;
@@ -219,6 +219,21 @@ export function GenerationLogsTable({
                             Gagal Sanitasi
                           </span>
                         )}
+                        {log.status === "berjalan" &&
+                          (Date.now() - startDate.getTime() > 15 * 60 * 1000 ? (
+                            <span
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200"
+                              title="Proses tidak selesai lebih dari 15 menit — kemungkinan terputus oleh batas durasi server. Tidak ada paket yang tersimpan."
+                            >
+                              <XCircle className="w-3 h-3 text-rose-500" />
+                              Terhenti
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                              <RefreshCw className="w-3 h-3 text-sky-500 animate-spin" />
+                              Sedang Berjalan
+                            </span>
+                          ))}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className="font-semibold text-emerald-700">{log.totalLolos} lolos</span>

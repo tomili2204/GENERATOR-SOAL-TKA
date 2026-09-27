@@ -10,19 +10,6 @@ export interface QuestionMicroSummary {
   stemSnippet: string;
 }
 
-const DEFAULT_KLISE_LIST: string[] = [
-  "[Geometri] Taman persegi 14m dengan kolam lingkaran di tengah mencari luas arsir (pi = 22/7)",
-  "[Geometri] Kapal berlayar ke utara 12 km lalu belok ke timur 9 km mencari jarak terdekat",
-  "[Geometri] Balok kawat berukuran 12 cm x 8 cm x 6 cm menghitung sisa kawat",
-  "[Bilangan] Daging beku dikeluarkan dari kulkas dengan suhu -4C naik 2C tiap 3 menit",
-  "[Bilangan] Aturan penskoran lomba matematika benar +4, salah -1, kosong 0",
-  "[Bilangan] Tiga anak (Ali, Budi, Cici) berenang bersama setiap 3, 4, dan 6 hari",
-  "[Aljabar] Membeli 3 buku tulis dan 2 pensil di koperasi sekolah seharga sekian rupiah",
-  "[Aljabar] Tarif taksi buka pintu Rp8.000 dan tarif per km Rp4.000",
-  "[Data & Peluang] Rata-rata nilai 29 siswa adalah 78, disusul 1 siswa susulan",
-  "[Data & Peluang] Melempar dua koin uang logam atau dua buah dadu bermata 6",
-];
-
 /**
  * Membersihkan teks soal menjadi intisari satu baris (micro-summary)
  * Menghapus delimiter berlebih agar hemat token namun sarat makna kontekstual
@@ -93,58 +80,40 @@ export async function fetchRecentQuestionsMemory(
     console.error("[SlidingWindowMemory] Gagal membaca riwayat soal dari database:", err);
   }
 
-  // Susun daftar hitam (Active Negative Memory)
-  const blacklistItems: string[] = [];
-
-  // Jika database sudah memiliki riwayat, ambil intisarinya
-  if (recentSummaries.length > 0) {
-    // Ambil maksimal 40 butir paling representatif agar hemat token (~400 token)
-    const sampled = recentSummaries.slice(0, 40);
-    sampled.forEach((item, idx) => {
-      blacklistItems.push(
-        `${idx + 1}. [${item.elemen}] ${item.temaKonteks}: "${item.stemSnippet}"`
-      );
-    });
+  // Ringkasan situasi (tema_konteks) yang sering dipakai, bukan potongan soal verbatim:
+  // menampilkan kalimat soal lama — walau berlabel "hindari" — terbukti membuat model
+  // menyalin nuansa dan kosakatanya lagi (efek anchoring).
+  const situasiCount = new Map<string, number>();
+  for (const item of recentSummaries) {
+    const key = item.temaKonteks.trim().toLowerCase();
+    if (!key || key === "umum") continue;
+    situasiCount.set(key, (situasiCount.get(key) || 0) + 1);
   }
+  const frequentSituasi = [...situasiCount.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 25)
+    .map(([situasi, n]) => (n > 1 ? `${situasi} (${n}x)` : situasi));
 
-  // Selalu sertakan 5 klise teratas jika mapel matematika
-  if (mapel.toLowerCase().includes("matematika")) {
-    DEFAULT_KLISE_LIST.slice(0, 5).forEach((klise) => {
-      if (!blacklistItems.some((b) => b.includes(klise.substring(0, 20)))) {
-        blacklistItems.push(`- (KLISE ABADI) ${klise}`);
-      }
-    });
-  }
-
-  // Deteksi kejenuhan PROFESI/PERAN TOKOH pada riwayat terakhir. Sekadar menampilkan
-  // stimulus lama sebagai "daftar hitam" terbukti TIDAK CUKUP mencegah pengulangan
-  // profesi — menunjukkan kata yang sama berulang kali sebagai konteks, walau
-  // berlabel "hindari", justru memperkuat kecenderungan model memilih kata itu lagi
-  // (efek anchoring). Maka di sini kita hitung eksplisit lalu larang keras hanya
-  // profesi yang benar-benar jenuh di batch ini, bukan daftar statis.
+  // Pekerjaan tokoh yang benar-benar jenuh di riwayat terakhir tetap diperingatkan secara
+  // eksplisit — hanya kata yang memang sudah muncul berulang, tanpa contoh tambahan.
   const sampledStems = recentSummaries.slice(0, 40).map((s) => s.stemSnippet.toLowerCase());
   const profesiWatchlist = [
     "arkeolog", "teknisi", "pilot drone", "operator drone", "jagawana",
-    "BBKSDA", "peneliti", "surveyor", "insinyur", "kurator",
+    "bbksda", "peneliti", "surveyor", "insinyur", "kurator",
   ];
-  const saturatedProfesi = profesiWatchlist.filter((p) => {
-    const count = sampledStems.filter((s) => s.includes(p.toLowerCase())).length;
-    return count >= 3;
-  });
+  const saturatedProfesi = profesiWatchlist.filter(
+    (p) => sampledStems.filter((s) => s.includes(p)).length >= 3
+  );
 
-  const saturationWarning = saturatedProfesi.length > 0
-    ? `\n\n=== PERINGATAN KEJENUHAN PROFESI TOKOH (WAJIB DIPATUHI) ===
-Profesi berikut MUNCUL BERULANG KALI di riwayat soal terakhir dan sudah JENUH — DILARANG TOTAL memakainya lagi sebagai profesi tokoh di paket ini, tanpa kecuali: ${saturatedProfesi.map((p) => `"${p}"`).join(", ")}.
-Ganti dengan profesi keseharian yang jauh berbeda (petani, nelayan, pedagang, pengrajin, penjahit, sopir, guru, bidan, kurir, montir, dst.) — JANGAN memilih profesi lain yang serupa nuansanya (mis. jangan ganti "arkeolog" dengan "kurator museum" atau "teknisi BTS" dengan "insinyur telekomunikasi", itu tetap termasuk pola yang dilarang).`
-    : "";
+  const parts: string[] = [];
+  if (frequentSituasi.length > 0) {
+    parts.push(`Situasi yang sudah sering dipakai pada paket-paket terakhir jenjang ini — pilih situasi lain agar bank soal tetap beragam:\n${frequentSituasi.join("; ")}.`);
+  }
+  if (saturatedProfesi.length > 0) {
+    parts.push(`Pekerjaan tokoh berikut sudah terlalu sering muncul, jangan dipakai di paket ini: ${saturatedProfesi.join(", ")}.`);
+  }
 
-  const promptBlock = `\n\n=== DAFTAR HITAM SKENARIO TERAKHIR (ACTIVE NEGATIVE MEMORY - WAJIB DIHINDARI) ===
-Sistem membaca bank soal paket sebelumnya di database. DILARANG KERAS mengulang skenario, nama toko/orang, kombinasi angka, atau model masalah yang mirip dengan daftar berikut:
-${blacklistItems.join("\n")}
-
-INSTRUKSI ANTI-REPETISI:
-- Ciptakan skenario baru yang segar dan berbeda dari daftar hitam di atas.
-- Dilarang mengganti nama orang saja tetapi alur cerita dan rumusnya tetap sama!${saturationWarning}`;
+  const promptBlock = parts.length > 0 ? `\n\nRIWAYAT PAKET TERAKHIR:\n${parts.join("\n")}` : "";
 
   return {
     promptBlock,
