@@ -54,6 +54,17 @@ export const JENJANG_TEXT_CRITERIA: Record<string, JenjangTextCriteria> = {
   },
 };
 
+/**
+ * Satu-satunya sumber teks threshold untuk dipakai di prompt AI (BSKAP_SYSTEM_PROMPT,
+ * getCurriculumPromptContext, dan skrip perbaikan lainnya) — supaya angka yang dilihat AI
+ * tidak pernah drift dari angka yang benar-benar dipakai validator di atas.
+ */
+export function formatWacanaCriteriaText(rawJenjang: string): string {
+  const jenjang = normalizeJenjang(rawJenjang);
+  const criteria = JENJANG_TEXT_CRITERIA[jenjang] || JENJANG_TEXT_CRITERIA["SMP/MTs"];
+  return `${criteria.minWords}-${criteria.maxWords} kata, rata-rata ${criteria.minWordsPerSentence}-${criteria.maxWordsPerSentence} kata/kalimat`;
+}
+
 export const DEFAULT_TECHNICAL_TERMS: string[] = [
   "inflasi",
   "deflasi",

@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { CheckCircle2, AlertTriangle, XCircle, Clock, RefreshCw, ChevronDown, ChevronUp, Package, ShieldCheck, Sparkles, Camera } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, Clock, RefreshCw, ChevronDown, ChevronUp, Package, ShieldCheck, Sparkles, Camera, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { TablePagination } from "@/components/ui/TablePagination";
 
 const NANO_BANANA_MARKER = "__NANO_BANANA_STATS__";
+const WACANA_REPAIR_MARKER = "__WACANA_REPAIR_STATS__";
 
 interface NanoBananaStats {
   converted: number;
@@ -13,10 +14,27 @@ interface NanoBananaStats {
   fallbackReasons: Record<string, number>;
 }
 
+interface WacanaRepairStats {
+  repaired: number;
+  failedAfterRepair: number;
+}
+
 function parseNanoBananaStats(
   detailPemeriksaan: Array<{ index: number; reason: string; itemTitle?: string }> | null
 ): NanoBananaStats | null {
   const entry = detailPemeriksaan?.find((f) => f.itemTitle === NANO_BANANA_MARKER);
+  if (!entry) return null;
+  try {
+    return JSON.parse(entry.reason);
+  } catch {
+    return null;
+  }
+}
+
+function parseWacanaRepairStats(
+  detailPemeriksaan: Array<{ index: number; reason: string; itemTitle?: string }> | null
+): WacanaRepairStats | null {
+  const entry = detailPemeriksaan?.find((f) => f.itemTitle === WACANA_REPAIR_MARKER);
   if (!entry) return null;
   try {
     return JSON.parse(entry.reason);
@@ -146,7 +164,10 @@ export function GenerationLogsTable({
               {paginatedLogs.map((log) => {
                 const isExpanded = expandedId === log.id;
                 const nanoBananaStats = parseNanoBananaStats(log.detailPemeriksaan);
-                const rejectedItems = (log.detailPemeriksaan || []).filter((f) => f.itemTitle !== NANO_BANANA_MARKER);
+                const wacanaRepairStats = parseWacanaRepairStats(log.detailPemeriksaan);
+                const rejectedItems = (log.detailPemeriksaan || []).filter(
+                  (f) => f.itemTitle !== NANO_BANANA_MARKER && f.itemTitle !== WACANA_REPAIR_MARKER
+                );
                 const hasFailedItems = rejectedItems.length > 0;
                 const startDate = new Date(log.startedAt);
 
@@ -215,6 +236,15 @@ export function GenerationLogsTable({
                           >
                             <Camera className="w-3 h-3" />
                             {nanoBananaStats.converted}/{nanoBananaStats.fallback}
+                          </span>
+                        )}
+                        {wacanaRepairStats && (wacanaRepairStats.repaired > 0 || wacanaRepairStats.failedAfterRepair > 0) && (
+                          <span
+                            className="inline-flex items-center gap-1 ml-2 px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 text-sky-800 text-[10px] font-semibold"
+                            title={`Perbaikan Wacana BSKAP: ${wacanaRepairStats.repaired} stimulus berhasil diperbaiki, ${wacanaRepairStats.failedAfterRepair} tetap gagal setelah diperbaiki`}
+                          >
+                            <Wand2 className="w-3 h-3" />
+                            {wacanaRepairStats.repaired}/{wacanaRepairStats.failedAfterRepair}
                           </span>
                         )}
                       </td>
@@ -320,6 +350,23 @@ export function GenerationLogsTable({
                                     ))}
                                   </div>
                                 )}
+                              </div>
+                            )}
+
+                            {wacanaRepairStats && (wacanaRepairStats.repaired > 0 || wacanaRepairStats.failedAfterRepair > 0) && (
+                              <div className="p-3 bg-sky-50/70 border border-sky-200 rounded-lg text-xs font-sans space-y-1.5">
+                                <span className="font-bold text-slate-800 flex items-center gap-1.5 font-mono">
+                                  <Wand2 className="w-3.5 h-3.5 text-sky-600" />
+                                  Perbaikan Otomatis Wacana BSKAP
+                                </span>
+                                <p className="text-slate-700">
+                                  <strong className="text-emerald-700">{wacanaRepairStats.repaired} stimulus</strong>{" "}
+                                  berhasil diperbaiki panjang/struktur kalimatnya tanpa perlu regenerasi total,{" "}
+                                  <strong className={wacanaRepairStats.failedAfterRepair > 0 ? "text-rose-700" : "text-slate-500"}>
+                                    {wacanaRepairStats.failedAfterRepair} stimulus
+                                  </strong>{" "}
+                                  tetap gagal walau sudah dicoba diperbaiki.
+                                </p>
                               </div>
                             )}
 

@@ -18,7 +18,7 @@ import { renderDiagramTemplate } from "./diagram-templates";
 import { generateMockGeminiBatchResponse as mockDataBatchResponse } from "./mock-data";
 import { selectThemeForGeneration } from "./theme-selector";
 import { normalizeJenjang } from "@/lib/jenjang-utils";
-import { validateLanguageTextComplexity, isLanguageSubject, countWords } from "./text-complexity";
+import { validateLanguageTextComplexity, isLanguageSubject, countWords, formatWacanaCriteriaText } from "./text-complexity";
 import { jsonrepair } from "jsonrepair";
 import { fetchRecentQuestionsMemory } from "./sliding-window-memory";
 import {
@@ -50,9 +50,9 @@ KOMPETENSI BAHASA INDONESIA/INGGRIS (tiga kompetensi membaca resmi Pusmendik):
 3. Evaluasi dan Apresiasi: menilai relevansi peristiwa teks dengan kehidupan sehari-hari, menilai kesesuaian/keakuratan unsur atau fakta vs opini, merespons secara emosional-estetis.
 
 KARAKTERISTIK TEKS BACAAN PER JENJANG (Bahasa Indonesia):
-- SD/MI: 150-200 kata, rata-rata 3-7 kata/kalimat, teks informasi fakta lokal/nasional atau teks fiksi anak berlatar konkret. HANYA kalimat tunggal pola dasar SPOK; TIDAK BOLEH kalimat majemuk.
-- SMP/MTs: 200-250 kata, rata-rata 5-9 kata/kalimat, teks informasi sains/lingkungan/teknologi atau fiksi realisme/biografi sejarah. WAJIB MENCAMPUR kalimat tunggal berbagai pola DENGAN kalimat majemuk setara (dihubungkan kata seperti 'dan', 'tetapi', 'atau', 'serta', 'melainkan' dengan kedudukan sejajar) — DILARANG hanya kalimat tunggal semua; TIDAK BOLEH kalimat majemuk bertingkat/kompleks dengan anak kalimat.
-- SMA/MA & SMK/MAK: 250-300 kata, rata-rata 8-12 kata/kalimat, teks informasi jamak/analitis, istilah teknis. Kalimat kompleks berbagai pola dan kalimat inversi DIPERBOLEHKAN di jenjang ini saja.
+- SD/MI: ${formatWacanaCriteriaText("SD/MI")}, teks informasi fakta lokal/nasional atau teks fiksi anak berlatar konkret. HANYA kalimat tunggal pola dasar SPOK; TIDAK BOLEH kalimat majemuk.
+- SMP/MTs: ${formatWacanaCriteriaText("SMP/MTs")}, teks informasi sains/lingkungan/teknologi atau fiksi realisme/biografi sejarah. WAJIB MENCAMPUR kalimat tunggal berbagai pola DENGAN kalimat majemuk setara (dihubungkan kata seperti 'dan', 'tetapi', 'atau', 'serta', 'melainkan' dengan kedudukan sejajar) — DILARANG hanya kalimat tunggal semua; TIDAK BOLEH kalimat majemuk bertingkat/kompleks dengan anak kalimat.
+- SMA/MA & SMK/MAK: ${formatWacanaCriteriaText("SMA/MA")}, teks informasi jamak/analitis, istilah teknis. Kalimat kompleks berbagai pola dan kalimat inversi DIPERBOLEHKAN di jenjang ini saja.
 
 PENEGASAN PANJANG DAN KOMPLEKSITAS KALIMAT — WAJIB DIPATUHI SECARA KETAT:
 Jumlah kata TOTAL pada tabel di atas adalah BATAS KERAS, bukan target longgar. Angka "kata/kalimat" pada tabel di atas adalah RATA-RATA di seluruh teks, BUKAN batas kaku yang harus dipenuhi SETIAP kalimat satu-per-satu. Sebuah stimulus dengan jumlah kata TOTAL di bawah batas bawah rentang jenjangnya dianggap CACAT dan harus ditolak, sama seperti stimulus yang melebihi batas atas.
@@ -60,10 +60,13 @@ Jumlah kata TOTAL pada tabel di atas adalah BATAS KERAS, bukan target longgar. A
 DILARANG KERAS menulis stimulus sebagai rangkaian kalimat tunggal pendek yang terasa dipotong-potong/robotik seperti daftar fakta terputus (ini adalah cacat kualitas yang sering terjadi dan WAJIB dihindari). Untuk SMP/MTs dan SMA/MA & SMK/MAK, WAJIB selingi kalimat pendek dengan kalimat majemuk setara agar teks mengalir alami layaknya tulisan manusia/jurnalistik, bukan poin-poin fakta yang dipisah paksa.
 Contoh SALAH (dilarang keras — seluruh kalimat tunggal terpisah-pisah, terasa seperti daftar fakta terputus):
 "Koperasi sekolah menjual alat tulis. Koperasi ini dikelola oleh siswa. Siswa bergiliran menjadi petugas jaga. Keuntungan koperasi digunakan untuk kegiatan sekolah."
-Contoh BENAR (panjang kalimat bervariasi, sebagian digabung wajar dengan konjungsi setara sehingga mengalir alami):
-"Koperasi sekolah menjual alat tulis dan dikelola langsung oleh siswa secara bergiliran. Keuntungan yang terkumpul digunakan untuk mendukung berbagai kegiatan sekolah."
+Contoh BENAR untuk SMP/MTs (rata-rata 7,0 kata/kalimat — TETAP dalam rentang 5-9, kalimat majemuk setara yang dipakai singkat, BUKAN kalimat majemuk panjang):
+"Koperasi sekolah menjual alat tulis setiap hari. Siswa bergiliran menjaga toko, dan guru mengawasi keuangan. Keuntungan koperasi dipakai untuk kegiatan sekolah."
+Perhatikan: kalimat majemuk setara ("Siswa bergiliran menjaga toko, dan guru mengawasi keuangan") tetap PENDEK (8 kata) — menggabungkan dua klausa pendek TIDAK BOLEH membuat rata-rata kata/kalimat keseluruhan teks melebihi batas atas jenjangnya.
 
 UNTUK SD/MI DAN SMP/MTs: DILARANG KERAS menggunakan kalimat majemuk bertingkat (kalimat dengan anak kalimat/klausa subordinatif, mis. yang diawali 'yang', 'karena', 'meskipun', 'apabila' di tengah kalimat panjang, atau kalimat dengan tanda pisah em-dash yang menyisipkan keterangan tambahan). Kalimat majemuk bertingkat dan kalimat kompleks HANYA diizinkan untuk SMA/MA & SMK/MAK mata uji wajib. Jangan menaikkan tingkat kesulitan bacaan dengan memperpanjang atau memperumit struktur kalimat di luar batas jenjangnya — panjang TOTAL teks tetap harus sesuai rentang kata yang ditentukan, berapa pun tingkat kesulitan soal yang menyertainya.
+
+WAJIB SELF-CHECK SEBELUM MENGIRIM JAWABAN: untuk SETIAP teks stimulus yang kamu tulis, hitung sendiri secara internal (a) jumlah total kata, dan (b) rata-rata kata per kalimat (total kata dibagi jumlah kalimat yang diakhiri tanda titik/tanya/seru). Bandingkan kedua angka itu dengan rentang resmi jenjangnya pada tabel di atas. Jika salah satu angka di luar rentang, REVISI kalimatnya (pendekkan atau gabungkan secukupnya) SEBELUM mengirim jawaban akhir — jangan mengirim teks yang belum kamu hitung sendiri kepatuhannya.
 
 CARA YANG BENAR MENAIKKAN TUNTUTAN KOGNITIF UNTUK LEVEL PENALARAN/TINGKAT KESULITAN TINGGI: tambahkan kompleksitas pada ISI, bukan pada STRUKTUR KALIMAT. Contoh cara yang benar: sisipkan dua informasi yang perlu dibandingkan pembaca sendiri (bukan langsung dinyatakan kesimpulannya), sisipkan hubungan sebab-akibat yang tersirat (bukan ditulis eksplisit dengan kata 'karena itu'), atau sisipkan data/angka yang saling terkait yang perlu disintesis pembaca. Semua ini tetap ditulis dengan kalimat pendek sesuai batas jenjang — kompleksitas ada di HUBUNGAN ANTARGAGASAN, bukan di PANJANG KALIMAT.
 
@@ -278,6 +281,55 @@ export async function callGeminiResilient(options: {
   }
 
   throw new Error(`Semua varian model Gemini sedang mengalami kendala: ${errors.slice(-3).join("; ")}`);
+}
+
+/**
+ * Perbaikan bertarget untuk stimulus yang gagal validasi wacana BSKAP (panjang kata/rata-rata
+ * kata per kalimat di luar rentang jenjang) — dipanggil SEBELUM stimulus dibuang & seluruh soal
+ * yang menempel padanya ikut ditolak. Sengaja TIDAK memakai BSKAP_SYSTEM_PROMPT penuh (yang berisi
+ * aturan format soal/SVG/kurikulum yang tidak relevan untuk tugas edit teks murni ini) supaya biaya
+ * per-panggilan jauh lebih murah daripada 1 ronde regenerasi batch penuh.
+ */
+async function repairStimulusWacana(
+  apiKey: string,
+  preferredModel: string,
+  originalText: string,
+  jenjang: string,
+  reasons: string[]
+): Promise<{ success: true; repairedText: string } | { success: false }> {
+  const targetBand = formatWacanaCriteriaText(jenjang);
+  const systemInstruction = `Anda adalah editor Bahasa Indonesia. Tugas Anda HANYA memperbaiki panjang total dan struktur/panjang kalimat sebuah teks bacaan agar sesuai batas resmi jenjang pendidikan, TANPA mengubah fakta, angka, nama, tema, atau alur cerita di dalamnya. Jangan menambah informasi baru dan jangan menghilangkan informasi penting.`;
+  const userPrompt = `Teks bacaan berikut GAGAL validasi panjang wacana:
+"""
+${originalText}
+"""
+
+Alasan gagal:
+${reasons.map((r) => `- ${r}`).join("\n")}
+
+Target WAJIB dipenuhi: ${targetBand} (jenjang ${jenjang}). Kalimat dihitung berdasarkan tanda titik/tanya/seru.
+
+Tulis ulang teks ini agar tepat memenuhi target di atas, TANPA mengubah fakta/angka/nama/tema aslinya. Sebelum menjawab, hitung sendiri secara internal jumlah kata total dan rata-rata kata per kalimat hasil tulisan ulangmu; jika masih di luar target, revisi lagi sampai benar-benar sesuai sebelum mengirim jawaban.
+
+Balas HANYA dengan array JSON berisi satu objek, tanpa teks lain: [{"stimulus_text": "teks hasil perbaikan di sini"}]`;
+
+  try {
+    const res = await callGeminiResilient({
+      apiKey,
+      preferredModel,
+      systemInstruction,
+      userPrompt,
+      temperature: 0.3,
+    });
+    const parsed = parseGeminiJson(res.rawText);
+    const repairedText = parsed?.[0]?.stimulus_text;
+    if (typeof repairedText === "string" && repairedText.trim().length > 0) {
+      return { success: true, repairedText: repairedText.trim() };
+    }
+    return { success: false };
+  } catch {
+    return { success: false };
+  }
 }
 
 // Kandidat model gambar "Nano Banana Pro" (nama tampilan resmi Google untuk keluarga model
@@ -566,13 +618,13 @@ export function getCurriculumPromptContext(jenjang: string, mapel: string): stri
   if (isBin) {
     if (jenjang.includes("SD")) {
       return `\nPANDUAN PUSMENDIK BAHASA INDONESIA (SD/MI):
-- Panjang wacana: 150-200 kata, kalimat 3-7 kata.
+- Panjang wacana: ${formatWacanaCriteriaText("SD/MI")}.
 - Teks Informasi (fakta lokal/nasional) & Teks Fiksi anak (alur maju, latar konkret).
 - Ukur 3 kompetensi membaca: Pemahaman Tekstual, Pemahaman Inferensial, dan Evaluasi-Apresiasi.
 - Soal grup wajib merujuk secara mendalam pada teks stimulus.`;
     } else {
       return `\nPANDUAN PUSMENDIK BAHASA INDONESIA (SMP/MTs):
-- Panjang wacana: 200-250 kata, kalimat 5-9 kata.
+- Panjang wacana: ${formatWacanaCriteriaText("SMP/MTs")}.
 - Teks Informasi (sains/lingkungan/teknologi) & Teks Fiksi (realisme/biografi sejarah).
 - Ukur 3 kompetensi membaca: Pemahaman Tekstual, Pemahaman Inferensial (hubungan kelogisan/sebab-akibat), dan Evaluasi-Apresiasi (keabsahan argumen, fakta vs opini).
 - Soal grup wajib merujuk secara mendalam pada teks stimulus.`;
@@ -619,9 +671,17 @@ ATURAN WAJIB:
 2. Jika catatan meminta redaksi ulang pertanyaan, opsi, atau pembahasan, tulis ulang secara utuh dan konsisten — jangan setengah-setengah atau menyisakan bagian lama yang kontradiktif dengan bagian baru.
 3. Jika catatan menyebutkan hasil perhitungan tidak bulat/tidak rapi, PILIH SALAH SATU: sesuaikan angka pada soal, ATAU ubah redaksi pertanyaan (misalnya menjadi "tambahan/kekurangan minimal") agar tetap valid secara matematis dan kunci jawabannya benar-benar cocok dengan salah satu opsi yang ada (jangan menghasilkan kunci yang tidak ada di daftar opsi).
 4. Field "pembahasan" WAJIB diuraikan bertingkat ke bawah per baris memakai karakter newline (\\n) untuk tiap langkah (contoh: "Diketahui: ...\\nLangkah 1: ...\\nLangkah 2: ...\\nSimpulan: ..."), jelas dan langsung ke inti. DILARANG memakai gaya bahasa yang terasa seperti keluaran AI generik (hindari frasa seperti "Tentu, berikut adalah...", "Sebagai AI...", "Baik, saya akan...", dsb) — tulis sebagaimana pendidik manusia menulis kunci pembahasan.
-5. Notasi matematika memakai LaTeX inline $...$ atau display $$...$$; di dalam JSON, escape backslash ganda (\\\\frac, \\\\times, \\\\sqrt, dst).
-6. Field "gambar": jika catatan validator TIDAK menyinggung ilustrasi/diagram sama sekali, kembalikan "gambar": null (sistem akan otomatis mempertahankan ilustrasi asli). Jika catatan validator secara eksplisit meminta perbaikan visual, sertakan revisi "gambar" mengikuti salah satu format: {"tipe": "svg", "svg_content": "<svg viewBox=\\"0 0 480 300\\" width=\\"100%\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>", "deskripsi_alt": "..."} untuk geometri/denah bebas, atau {"tipe": "diagram", "archetype": "diagram_batang"|"diagram_lingkaran"|"model_pecahan"|"garis_bilangan", "data": {...}, "deskripsi_alt": "..."} untuk diagram data/pecahan/garis bilangan (parameter data mengikuti skema masing-masing archetype).
-7. Kembalikan HANYA array JSON valid berisi TEPAT SATU objek, tanpa markdown code fence dan tanpa teks penjelasan apa pun di luar JSON, dengan skema PERSIS:
+5. Notasi matematika memakai LaTeX inline $...$ atau display $$...$$; di dalam JSON, escape backslash ganda (\\\\frac, \\\\times, \\\\sqrt, dst). PASTIKAN setiap tanda '$' dan '$$' selalu berpasangan lengkap dan ditutup dengan benar (jumlah tanda '$' dan '$$' harus selalu genap, dilarang meninggalkan tanda pembuka tanpa penutup).
+6. Field "gambar": jika catatan validator meminta ganti soal/tema total, atau jika soal baru tidak lagi berhubungan dengan gambar lama, WAJIB buat ilustrasi SVG baru yang sesuai dengan topik baru atau kembalikan "gambar": null (DILARANG mempertahankan gambar lama yang tidak relevan). Jika catatan validator TIDAK menyinggung ilustrasi dan topik soal tetap sama, kembalikan "gambar": null (sistem akan mempertahankan ilustrasi asli). Jika catatan validator secara eksplisit meminta perbaikan visual, sertakan revisi "gambar" mengikuti salah satu format: {"tipe": "svg", "svg_content": "<svg viewBox=\\"0 0 480 300\\" width=\\"100%\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>", "deskripsi_alt": "..."} untuk geometri/denah bebas, atau {"tipe": "diagram", "archetype": "diagram_batang"|"diagram_lingkaran"|"model_pecahan"|"garis_bilangan", "data": {...}, "deskripsi_alt": "..."} untuk diagram data/pecahan/garis bilangan (parameter data mengikuti skema masing-masing archetype).
+7. PADA SOAL BENTUK PGK_MCMA (Pilihan Ganda Kompleks Multi-Jawaban):
+   - DILARANG membuat semua opsi bernilai benar (semua opsi benar adalah cacat desain soal asesmen).
+   - Jika validator menyarankan agar "tidak semua jawaban benar" atau meminta agar "ada jawaban yang bernilai salah", JANGAN SELALU membuat pola malas yang hanya menyalahkan tepat 1 opsi (3 benar, 1 salah).
+   - VARIASIKAN jumlah opsi yang benar secara proporsional dan mendidik:
+     * Kombinasi 2 OPSI BENAR (dan 2 opsi salah) — SANGAT DISARANKAN untuk daya beda asesmen penalaran.
+     * Kombinasi 1 OPSI BENAR (dan 3 opsi salah) — sangat baik untuk mengecoh miskonsepsi umum.
+     * Kombinasi 3 OPSI BENAR (dan 1 opsi salah).
+   - Buatlah opsi pengecoh (distraktor salah) dengan kekeliruan konsep, rumus, atau hitungan yang masuk akal bagi siswa, lalu sesuaikan "kunci_jawaban" dan "pembahasan" secara konsisten.
+8. Kembalikan HANYA array JSON valid berisi TEPAT SATU objek, tanpa markdown code fence dan tanpa teks penjelasan apa pun di luar JSON, dengan skema PERSIS:
 [{
   "soal_text": string,
   "opsi": [{"label": string, "text": string}] | null,
@@ -1144,13 +1204,15 @@ ${formatArchetypeGuidancePrompt(deterministicSlotPlans.slice(chunk1Count), jenja
   const rejectedStimuli: Record<string, { reasons: string[]; metricsSummary: string }> = {};
   const textComplexityLogs: Array<{ index: number; reason: string; itemTitle?: string }> = [];
   const failedItems: Array<{ index: number; reason: string; itemTitle?: string }> = [];
+  let wacanaRepaired = 0;
+  let wacanaRepairFailed = 0;
 
   for (const stim of stimulusObjects) {
     const tempId = stim.stimulus_id_sementara;
-    const content = stim.konten || "";
+    let content = stim.konten || "";
 
     // Pemeriksaan BSKAP (Hanya Bahasa Indonesia/Inggris, Matematika dilewati total)
-    const valResult = validateLanguageTextComplexity({
+    let valResult = validateLanguageTextComplexity({
       rawJenjang: jenjang,
       mapel,
       text: content,
@@ -1170,6 +1232,42 @@ ${formatArchetypeGuidancePrompt(deterministicSlotPlans.slice(chunk1Count), jenja
           reason: w,
           itemTitle: "Peringatan Wacana BSKAP",
         });
+      }
+    }
+
+    // Jika gagal wacana, coba PERBAIKI teksnya (murah) sebelum membuang seluruh stimulus +
+    // semua soal grup yang menempel padanya (mahal — butuh regenerasi total lewat ronde retry).
+    if (!valResult.valid) {
+      let candidateText = content;
+      let candidateReasons = valResult.reasons;
+      let repairAttempt = 0;
+      let repairedOk = false;
+      while (repairAttempt < 2 && !repairedOk) {
+        repairAttempt++;
+        const repairResult = await repairStimulusWacana(apiKey, modelName, candidateText, jenjang, candidateReasons);
+        if (!repairResult.success) break;
+
+        const reValResult = validateLanguageTextComplexity({
+          rawJenjang: jenjang,
+          mapel,
+          text: repairResult.repairedText,
+          sourceLabel: `Stimulus "${tempId}" (hasil perbaikan)`,
+        });
+
+        candidateText = repairResult.repairedText;
+        candidateReasons = reValResult.reasons.length ? reValResult.reasons : candidateReasons;
+        valResult = reValResult;
+
+        if (reValResult.valid) {
+          content = repairResult.repairedText;
+          repairedOk = true;
+        }
+      }
+
+      if (repairedOk) {
+        wacanaRepaired++;
+      } else {
+        wacanaRepairFailed++;
       }
     }
 
@@ -1419,13 +1517,18 @@ ${formatArchetypeGuidancePrompt(deterministicSlotPlans.slice(chunk1Count), jenja
     const missingCount = totalDiminta - validQuestions.length;
     console.log(`[Regenerasi AI BSKAP] Percobaan ke-${retryAttempts}: Mengajukan ${missingCount} butir pengganti untuk melengkapi kuota ${totalDiminta}.`);
 
+    const specificRejectionReasons = Object.values(rejectedStimuli)
+      .flatMap((r) => r.reasons)
+      .slice(0, 8);
+
     let retryUserPrompt = `PERHATIAN REGENERASI BSKAP: Pada pengiriman sebelumnya, terdapat butir/stimulus yang DITOLAK gerbang kualitas karena melanggar ketentuan resmi.
 Hasilkan tepat ${missingCount} butir soal pengganti berkualitas tinggi untuk jenjang ${jenjang} dan mata pelajaran ${mapel}.
 
 ${isLanguageSubject(mapel) ? `WAJIB DIPATUHI SECARA KETAT SESUAI PERKABAN BSKAP:
-- Jika menyertakan stimulus teks wacana baru, panjang teks WAJIB tepat dalam rentang resmi jenjang ${jenjang}.
-- Rata-rata kata per kalimat WAJIB dalam rentang resmi jenjang ${jenjang}.
-- DILARANG melebihi atau mengurangi batas tersebut. Teks yang tidak memenuhi batas akan langsung ditolak sistem.` : ''}
+- Jika menyertakan stimulus teks wacana baru, panjang teks WAJIB tepat dalam rentang resmi jenjang ${jenjang}: ${formatWacanaCriteriaText(jenjang)}.
+- DILARANG melebihi atau mengurangi batas tersebut. Teks yang tidak memenuhi batas akan langsung ditolak sistem.
+- HITUNG SENDIRI jumlah kata total dan rata-rata kata/kalimat teksmu sebelum menjawab; revisi dulu jika di luar rentang.
+${specificRejectionReasons.length > 0 ? `\nALASAN PERSIS penolakan pada pengiriman sebelumnya (JANGAN ulangi kesalahan yang sama):\n${specificRejectionReasons.map((r) => `- ${r}`).join("\n")}` : ""}` : ''}
 
 ${curriculumGuidance}`;
 
@@ -1464,9 +1567,9 @@ ${curriculumGuidance}`;
     for (const stim of retryStimuli) {
       const tempId = `retry-${retryAttempts}-${stim.stimulus_id_sementara}`;
       stim.stimulus_id_sementara = tempId;
-      const content = stim.konten || "";
+      let content = stim.konten || "";
 
-      const valResult = validateLanguageTextComplexity({
+      let valResult = validateLanguageTextComplexity({
         rawJenjang: jenjang,
         mapel,
         text: content,
@@ -1479,6 +1582,40 @@ ${curriculumGuidance}`;
           reason: `[Regenerasi] ${valResult.metricsSummary}`,
           itemTitle: `Pemeriksaan Wacana BSKAP (${tempId})`,
         });
+      }
+
+      if (!valResult.valid) {
+        let candidateText = content;
+        let candidateReasons = valResult.reasons;
+        let repairAttempt = 0;
+        let repairedOk = false;
+        while (repairAttempt < 2 && !repairedOk) {
+          repairAttempt++;
+          const repairResult = await repairStimulusWacana(apiKey, modelName, candidateText, jenjang, candidateReasons);
+          if (!repairResult.success) break;
+
+          const reValResult = validateLanguageTextComplexity({
+            rawJenjang: jenjang,
+            mapel,
+            text: repairResult.repairedText,
+            sourceLabel: `Stimulus Pengganti "${tempId}" (hasil perbaikan)`,
+          });
+
+          candidateText = repairResult.repairedText;
+          candidateReasons = reValResult.reasons.length ? reValResult.reasons : candidateReasons;
+          valResult = reValResult;
+
+          if (reValResult.valid) {
+            content = repairResult.repairedText;
+            repairedOk = true;
+          }
+        }
+
+        if (repairedOk) {
+          wacanaRepaired++;
+        } else {
+          wacanaRepairFailed++;
+        }
       }
 
       if (!valResult.valid) {
@@ -1573,6 +1710,14 @@ ${curriculumGuidance}`;
         });
       }
     }
+  }
+
+  if (wacanaRepaired > 0 || wacanaRepairFailed > 0) {
+    textComplexityLogs.push({
+      index: 0,
+      reason: JSON.stringify({ repaired: wacanaRepaired, failedAfterRepair: wacanaRepairFailed }),
+      itemTitle: "__WACANA_REPAIR_STATS__",
+    });
   }
 
   // 5D. Lapis 4: Evaluasi Kemiripan (Similarity Check) & Kalibrasi Observasi 5-7 Hari
@@ -1723,6 +1868,20 @@ ${curriculumGuidance}`;
       // field "tipe". diagramOriginGambar (WeakSet) yang membedakannya -- TANPA cek ini, diagram
       // data presisi akan ikut salah dikonversi jadi foto (bug nyata yang pernah terjadi).
       if (diagramOriginGambar.has(vq.gambar)) continue;
+
+      // JANGAN konversi diagram data kuantitatif, grafik, tabel, atau diagram garis/koordinat matematika
+      const isQuantitativeChart =
+        vq.elemen === "Data dan Peluang" ||
+        /diagram|grafik|tabel|sumbu|koordinat|garis bilangan|histogram|kartesius|frekuensi|piktogram/i.test(
+          vq.sub_elemen || ""
+        ) ||
+        /diagram|grafik|tabel|sumbu\s*[xy]|garis\s*bilangan|koordinat/i.test(
+          vq.soal_text || ""
+        ) ||
+        /diagram|grafik|tabel|chart|plot/i.test(
+          vq.gambar.deskripsi_alt || ""
+        );
+      if (isQuantitativeChart) continue;
 
       const deskripsiAlt = vq.gambar.deskripsi_alt || vq.soal_text?.slice(0, 120) || "Ilustrasi soal";
       const imagePrompt = `Konteks soal TKA (${jenjang} - ${mapel}): ${vq.soal_text}\n\nDeskripsi ilustrasi yang dibutuhkan: ${deskripsiAlt}\n\nGambarkan HANYA skenario/pemandangan nyata yang dideskripsikan. DILARANG KERAS menambahkan garis bantu geometri, label sudut, label ukuran/angka, notasi matematika, panah pengukuran, atau anotasi teknis apa pun pada gambar. Gambar harus berupa ilustrasi/foto adegan natural, bukan diagram.`;

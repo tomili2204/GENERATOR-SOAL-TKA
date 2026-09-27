@@ -2,6 +2,7 @@ import { db, ensureTablesCreated } from "@/db";
 import { stimulus } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getStoredAiConfig, callGeminiResilient, parseGeminiJson } from "@/lib/generator/gemini-generator";
+import { JENJANG_TEXT_CRITERIA } from "@/lib/generator/text-complexity";
 
 const APPLY = process.argv.includes("--apply");
 const LIMIT_ARG = process.argv.find((a) => a.startsWith("--limit="));
@@ -23,15 +24,9 @@ async function withRetry<T>(fn: () => Promise<T>, label: string, attempts = 3): 
   throw lastErr;
 }
 
-const WORD_BAND: Record<string, [number, number]> = {
-  "SD/MI": [150, 200],
-  "SMP/MTs": [200, 250],
-  "SMA/MA": [250, 300],
-  "SMK/MAK": [250, 300],
-};
-
 function buildPrompt(text: string, jenjang: string): string {
-  const band = WORD_BAND[jenjang] || [150, 300];
+  const criteria = JENJANG_TEXT_CRITERIA[jenjang] || JENJANG_TEXT_CRITERIA["SMP/MTs"];
+  const band: [number, number] = [criteria.minWords, criteria.maxWords];
   return `Tulis ulang teks bacaan Bahasa Indonesia berikut agar gaya kalimatnya terasa alami seperti tulisan penulis konten profesional, TANPA mengubah satu pun fakta, angka, nama, atau istilah teknis di dalamnya.
 
 ATURAN PENGGABUNGAN KALIMAT (WAJIB DIPATUHI DENGAN HATI-HATI):
@@ -78,7 +73,8 @@ async function main() {
   for (let i = 0; i < targets.length; i++) {
     const s = targets[i] as any;
     const original = s.konten as string;
-    const band = WORD_BAND[s.jenjang] || [150, 300];
+    const bandCriteria = JENJANG_TEXT_CRITERIA[s.jenjang] || JENJANG_TEXT_CRITERIA["SMP/MTs"];
+    const band: [number, number] = [bandCriteria.minWords, bandCriteria.maxWords];
     process.stdout.write(`[${i + 1}/${targets.length}] ${s.id} (${s.jenjang})... `);
 
     try {
