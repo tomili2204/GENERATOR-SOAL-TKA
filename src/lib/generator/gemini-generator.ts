@@ -1206,6 +1206,16 @@ ${formatCompetencyPlanPrompt(competencySlotPlans.slice(chunk1Count))}`;
       if (!Array.isArray(q.opsi) || q.opsi.length < 2) {
         reasons.push("Bentuk PGK_MCMA wajib memiliki minimal 2 opsi jawaban.");
       }
+      if (
+        Array.isArray(q.opsi) &&
+        Array.isArray(q.kunci_jawaban) &&
+        q.opsi.length >= 2 &&
+        q.kunci_jawaban.length === q.opsi.length
+      ) {
+        reasons.push(
+          "Bentuk PGK_MCMA dilarang membuat semua opsi bernilai benar (cacat desain soal asesmen); minimal 1 opsi harus salah."
+        );
+      }
     } else if (q.bentuk_soal === "PGK_KATEGORI") {
       if (!Array.isArray(q.pernyataan) || q.pernyataan.length === 0) {
         reasons.push("Bentuk PGK_KATEGORI wajib memiliki daftar pernyataan.");
