@@ -55,6 +55,7 @@ async function handleCron(req: NextRequest) {
             configId: cfg.id,
             totalSoal: cfg.dailyTargetQuota || 30,
             triggeredBy: "schedule",
+            themeMode: "auto_multi",
           });
           return {
             configId: cfg.id,

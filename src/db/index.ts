@@ -93,6 +93,7 @@ export async function ensureTablesCreated() {
     );
 
     ALTER TABLE tema_konteks_pool ADD COLUMN IF NOT EXISTS jenjang_cocok JSONB DEFAULT '["SD/MI","SMP/MTs","SMA/MA","SMK/MAK"]'::jsonb NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS tema_konteks_pool_nama_tema_key ON tema_konteks_pool (nama_tema);
 
     ALTER TABLE questions ADD COLUMN IF NOT EXISTS previous_payload JSONB;
     ALTER TABLE questions ADD COLUMN IF NOT EXISTS previous_validation_notes TEXT;

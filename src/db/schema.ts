@@ -155,7 +155,7 @@ export const questions = soalSchema.table("questions", {
 // Tabel Pool Tema Konteks (Variasi Latar & Konteks Cerita Soal AI)
 export const temaKonteksPool = soalSchema.table("tema_konteks_pool", {
   id: text("id").primaryKey(),
-  namaTema: text("nama_tema").notNull(),
+  namaTema: text("nama_tema").notNull().unique(),
   subKonteks: jsonb("sub_konteks").$type<string[]>().default([]).notNull(),
   jenjangCocok: jsonb("jenjang_cocok").$type<string[]>().default(["SD/MI", "SMP/MTs", "SMA/MA", "SMK/MAK"]).notNull(),
   aktif: boolean("aktif").default(true).notNull(),

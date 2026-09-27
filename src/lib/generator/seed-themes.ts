@@ -229,6 +229,9 @@ export async function ensureThemesSeeded() {
       const match = existingMap.get(theme.namaTema.toLowerCase().trim());
       if (!match) {
         const id = `tema-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        // onConflictDoNothing (butuh unique index di nama_tema) menutup race condition saat
+        // beberapa generateBatchQuestions() jalan paralel (mis. cron lintas jenjang/mapel)
+        // dan masing-masing lolos cek existingMap sebelum salah satunya selesai insert.
         await db.insert(temaKonteksPool).values({
           id,
           namaTema: theme.namaTema,
@@ -237,7 +240,7 @@ export async function ensureThemesSeeded() {
           aktif: theme.aktif,
           createdAt: new Date(),
           updatedAt: new Date(),
-        });
+        }).onConflictDoNothing({ target: temaKonteksPool.namaTema });
       } else {
         // Jika sudah ada, pastikan jenjangCocok diperbarui sesuai instruksi jika berbeda
         const currentJenjang = match.jenjangCocok || [];
