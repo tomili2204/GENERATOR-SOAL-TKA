@@ -48,5 +48,31 @@ export function validateLatexDelimiters(
     };
   }
 
+  const structureIssues = findLatexStructureIssues(normalized);
+  if (structureIssues.length > 0) {
+    return {
+      valid: false,
+      error: `Struktur rumus LaTeX pada ${fieldName} rusak: ${structureIssues.join("; ")}.`,
+    };
+  }
+
   return { valid: true };
+}
+
+// Jumlah '$' genap belum menjamin rumus ter-render: fragmen seperti "$Total $= 140 + 180$ kg$"
+// dan perintah LaTeX di luar pasangan '$' lolos cek paritas tetapi tampil sebagai teks mentah.
+function findLatexStructureIssues(text: string): string[] {
+  const issues: string[] = [];
+
+  if (/(?<!\$)\$[A-Za-z][A-Za-z\s\-]*\s\$\s*[=<>+]/.test(text)) {
+    issues.push("satu persamaan terpecah ke beberapa pasangan '$' (label kata terpisah dari rumusnya)");
+  }
+
+  const outsideMath = text.replace(/\$\$[\s\S]*?\$\$|\$[^\$\n]+?\$/g, " ");
+  const bareCommand = outsideMath.match(/\\(frac|sqrt|times|cdot|div|text|approx)\b/);
+  if (bareCommand) {
+    issues.push(`perintah \\${bareCommand[1]} berada di luar pasangan '$' sehingga tidak ter-render`);
+  }
+
+  return issues;
 }

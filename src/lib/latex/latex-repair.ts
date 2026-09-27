@@ -18,6 +18,12 @@
  * - \n + "e" (dalam konteks matematika) -> \ne
  */
 
+// Satuan yang dirapikan ke dalam \text{} (langkah 6d) — dipakai juga oleh langkah 9d agar
+// satuan yang sudah dimasukkan tidak dikeluarkan lagi (repair harus idempoten karena
+// dijalankan saat simpan dan lagi saat render di LatexPreview).
+const UNIT_WORDS = "m²|m³|m|cm|mm|km|kg|gram|liter|detik|menit|jam|hari|tahun|buah|biji|butir|orang|lembar|porsi";
+const UNIT_ONLY = new RegExp(`^(${UNIT_WORDS})$`, "i");
+
 export function repairLatexString(content: string): string {
   if (!content || typeof content !== "string") return content;
 
@@ -108,6 +114,13 @@ export function repairLatexString(content: string): string {
   text = text.replace(/\bRp\s*\$([0-9\.\,\{\}]+)\$/gi, (_m, val) => `Rp ${val.replace(/[\{\}]/g, "")}`);
   text = text.replace(/=\s*\\text\{Rp\s*\}\s*([0-9\.\,\{\}]+)\s*\$/gi, (_m, val) => `=$ Rp ${val.replace(/[\{\}]/g, "")}`);
 
+  // 6d. Seragamkan penulisan satuan matematis di belakang $...$ agar masuk ke dalam math block \text{...}
+  // Menghindari ukuran & font belang-belang antara angka dalam $ dan satuan di luar $ (misal "$0{,}2$ m" -> "$0{,}2\text{ m}$")
+  text = text.replace(
+    new RegExp(`\\$([^$\\n]+?)\\$\\s+(${UNIT_WORDS})(?=[\\s\\.,;\\)]|$)`, "gi"),
+    (_m, math, unit) => `$${math.trim()}\\text{ ${unit}}$`
+  );
+
   // 7. Auto-wrap ekspresi LaTeX telanjang di luar delimiter $
   // Pisahkan string berdasarkan delimiter math yang valid ($$...$$ atau $...$)
   const parts = text.split(/(\$\$[\s\S]*?\$\$|\$[^\$\n]+?\$)/g);
@@ -178,18 +191,61 @@ export function repairLatexString(content: string): string {
   // (b) Unpack $\therefore \text{...}$ -> $\therefore$ ...
   text = text.replace(/\$\s*\\therefore\s*\\text\{([^{}]+)\}\s*\$/g, "$\\therefore$ $1");
 
-  // (c) Unpack leading \text{...} dari math block jika berupa frasa narasi
-  text = text.replace(/\$\s*\\text\{([^{}]+)\}\s*([^\$]+?)\$/g, (_match, prefix, math) => {
+  // (c) & (d) HANYA untuk segmen inline $...$ tunggal. Tanpa guard (?<!\$)\$(?!\$), regex ini
+  // mulai mencocokkan dari "$" kedua pada "$$" dan memecah blok display yang benar
+  // ("$$\text{Total} = 140 + 180 = 320\text{ kg}$$") menjadi fragmen "$Total $= 140 + 180 = 320$ kg$".
+
+  // (c) Unpack leading \text{...} dari math inline jika berupa frasa narasi
+  text = text.replace(/(?<!\$)\$(?!\$)\s*\\text\{([^{}]+)\}\s*([^\$]+?)\$(?!\$)/g, (_match, prefix, math) => {
     return `${prefix.trim()} $${math.trim()}$`;
   });
 
-  // (d) Unpack trailing \text{...} jika berupa kalimat penjelas (bukan satuan pendek)
-  text = text.replace(/\$([^\$]+?)\s*\\text\{([^{}]+)\}\s*\$/g, (match, math, suffix) => {
-    if (suffix.length > 5 || /[\s\(\)\:\.\,]/.test(suffix) || /^(benar|salah|kali|buah|orang|butir|hari)/i.test(suffix.trim())) {
-      return `$${math.trim()}$ ${suffix.trim()}`;
+  // (d) Unpack trailing \text{...} jika berupa kalimat penjelas (bukan satuan dari langkah 6d)
+  text = text.replace(/(?<!\$)\$(?!\$)([^\$]+?)\s*\\text\{([^{}]+)\}\s*\$(?!\$)/g, (match, math, suffix) => {
+    const s = suffix.trim();
+    if (UNIT_ONLY.test(s)) return match;
+    if (s.length > 5 || /[\s\(\)\:\.\,]/.test(s) || /^(benar|salah|kali)$/i.test(s)) {
+      return `$${math.trim()}$ ${s}`;
     }
     return match;
   });
+
+  // 10. Auto-healing untuk delimiter matematika yang tidak berpasangan (ganjil)
+  // (a) Delimiter display/block $$
+  const unescapedDouble = text.replace(/\\(\$)/g, "__ESCAPED_DOLLAR__");
+  const doubleMatches = unescapedDouble.match(/\$\$/g);
+  if (doubleMatches && doubleMatches.length % 2 !== 0) {
+    const lastDoubleIndex = text.lastIndexOf("$$");
+    if (lastDoubleIndex !== -1) {
+      const textAfter = text.substring(lastDoubleIndex + 2);
+      if (!textAfter.includes("$$")) {
+        if (textAfter.trim().length > 0) {
+          text = text + " $$";
+        } else {
+          text = text.substring(0, lastDoubleIndex);
+        }
+      }
+    }
+  }
+
+  // (b) Delimiter inline $
+  const unescapedSingle = text
+    .replace(/\\(\$)/g, "__ESCAPED_DOLLAR__")
+    .replace(/\$\$/g, "");
+  const singleMatches = unescapedSingle.match(/\$/g);
+  if (singleMatches && singleMatches.length % 2 !== 0) {
+    const lastSingleIndex = text.lastIndexOf("$");
+    if (lastSingleIndex !== -1) {
+      const textAfter = text.substring(lastSingleIndex + 1);
+      if (!textAfter.includes("$")) {
+        if (textAfter.trim().length > 0) {
+          text = text + " $";
+        } else {
+          text = text.substring(0, lastSingleIndex);
+        }
+      }
+    }
+  }
 
   return text;
 }
