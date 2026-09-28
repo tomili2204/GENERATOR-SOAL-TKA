@@ -24,6 +24,8 @@ import {
   Image as ImageIcon,
   Wand2,
   Loader2,
+  Info,
+  Trash2,
 } from "lucide-react";
 
 interface SlotQuestionModalProps {
@@ -358,9 +360,22 @@ export function SlotQuestionModal({
         {slot.isFilled && (q?.status === "direvisi" || q?.status === "perlu_revisi") && (
           <div className="bg-orange-50 border-b border-orange-200 px-6 py-3 flex items-start gap-2.5 text-xs text-orange-900 shrink-0">
             <AlertTriangle className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 flex-1">
               <span className="font-bold block">Catatan Perbaikan Validator:</span>
               <ValidatorNoteText text={q.validationNotes || "Perlu penyesuaian formula atau redaksi."} />
+            </div>
+          </div>
+        )}
+
+        {slot.isFilled && q?.status === "menunggu_validasi" && q?.previousValidationNotes && (
+          <div className="bg-sky-50 border-b border-sky-200 px-6 py-3 flex items-start gap-2.5 text-xs text-sky-900 shrink-0">
+            <Info className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+            <div className="space-y-1.5 flex-1">
+              <span className="font-bold block">Catatan Revisi Validator Sebelumnya (Tahap 1):</span>
+              <ValidatorNoteText text={q.previousValidationNotes} />
+              <p className="text-[11px] text-sky-700">
+                Butir soal ini telah Anda perbaiki dan saat ini sedang menunggu telaah validasi ulang (Tahap 2) dari validator.
+              </p>
             </div>
           </div>
         )}
@@ -607,21 +622,37 @@ export function SlotQuestionModal({
                 )}
               </div>
 
-              {/* Pratinjau Ilustrasi (dipertahankan otomatis kecuali diganti lewat Perbaiki dengan AI) */}
-              {gambar && gambar.tipe === "svg" && gambar.svg_content && (
-                <div>
-                  <label className="font-semibold text-slate-900 block mb-1.5 text-xs">
+              {/* Pratinjau & Kontrol Ilustrasi */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-semibold text-slate-900 text-xs">
                     Ilustrasi / Diagram Pendukung
                   </label>
+                  {gambar && (
+                    <button
+                      type="button"
+                      onClick={() => setGambar(null)}
+                      title="Hapus ilustrasi jika soal diganti dan gambar lama sudah tidak relevan"
+                      className="px-2 py-0.5 text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-md border border-rose-200 transition-colors flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Hapus Gambar (Jadikan Tanpa Ilustrasi)</span>
+                    </button>
+                  )}
+                </div>
+                {gambar && gambar.tipe === "svg" && gambar.svg_content ? (
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
                     <SvgIllustration svgContent={gambar.svg_content} altText={gambar.deskripsi_alt} />
                     <p className="text-[11px] text-slate-400 mt-1.5">
-                      Ilustrasi ini dipertahankan otomatis saat disimpan. Gunakan tombol "Perbaiki dengan AI" di
-                      pojok kanan atas bila catatan validator meminta perubahan visual.
+                      💡 Klik tombol <strong>Hapus Gambar</strong> di atas bila isi soal telah diubah dan gambar lama tidak lagi sesuai.
                     </p>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="p-3 rounded-lg bg-slate-50/60 border border-dashed border-slate-300 text-center text-xs text-slate-400">
+                    <span>Butir soal ini tidak menyertakan gambar/ilustrasi.</span>
+                  </div>
+                )}
+              </div>
 
               {/* Opsi Jawaban (PG / PGK_MCMA) */}
               {bentukSoal !== "PGK_KATEGORI" ? (

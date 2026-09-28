@@ -114,15 +114,15 @@ export function QuestionReviewModal({
             </div>
           )}
 
-          {/* Catatan Telaah Sebelumnya (Konteks jika Butir Soal Pernah Direvisi/Ditolak) */}
-          {question.validationNotes && (
+          {/* Catatan Telaah Sebelumnya (Konteks jika Butir Soal Pernah Direvisi/Ditolak tapi tidak ada perbandingan payload) */}
+          {!question.previousPayload && (question.validationNotes || question.previousValidationNotes) && (
             <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-3">
               <AlertTriangle className="w-4.5 h-4.5 text-amber-600 shrink-0 mt-0.5" />
               <div className="space-y-1.5 flex-1">
                 <strong className="font-bold text-amber-900 block">
                   Catatan Telaah Sebelumnya (Status Saat Ini: {question.status || "–"}):
                 </strong>
-                <ValidatorNoteText text={question.validationNotes} />
+                <ValidatorNoteText text={question.validationNotes || question.previousValidationNotes} />
                 <p className="text-[11px] text-amber-700">
                   Catatan ini sudah dimuat ke kolom di bawah saat Anda memilih "Minta Revisi" atau "Tolak Soal" — silakan sunting atau lengkapi sebelum mengirim ulang.
                 </p>
@@ -136,6 +136,7 @@ export function QuestionReviewModal({
               previous={question.previousPayload}
               current={payload}
               bentukSoal={question.bentukSoal}
+              previousValidationNotes={question.previousValidationNotes || question.validationNotes}
             />
           )}
 

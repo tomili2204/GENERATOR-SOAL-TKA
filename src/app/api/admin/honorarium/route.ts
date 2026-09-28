@@ -31,8 +31,22 @@ export async function GET() {
     const allUsers: User[] = await db.select().from(users);
     const allRoles: UserRole[] = await db.select().from(userRoles);
 
-    // Ambil semua soal dan log validasi
-    const allQuestions: Question[] = await db.select().from(questions);
+    interface SlimHonorariumQuestion {
+      id: string;
+      validatorId: string | null;
+      status: string;
+      paketId: string | null;
+    }
+
+    // Ambil data soal secara ramping (hanya validatorId, status, paketId, hindari payload 150MB)
+    const allQuestions: SlimHonorariumQuestion[] = await db
+      .select({
+        id: questions.id,
+        validatorId: questions.validatorId,
+        status: questions.status,
+        paketId: questions.paketId,
+      })
+      .from(questions);
     const allPackages: QuestionPackage[] = await db.select().from(questionPackages);
     const allValidationLogs: ValidationLog[] = await db.select().from(validationLogs);
     const allHonorarium: HonorariumRecord[] = await db.select().from(honorariumRecords).orderBy(desc(honorariumRecords.createdAt));

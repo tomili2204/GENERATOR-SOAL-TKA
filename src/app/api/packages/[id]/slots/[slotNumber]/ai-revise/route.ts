@@ -105,9 +105,12 @@ export async function POST(
       );
     }
 
-    // Field "gambar": null dari AI berarti pertahankan ilustrasi asli; jika AI mengirim
-    // format template diagram, terjemahkan dulu jadi SVG final sebelum divalidasi.
-    let finalGambar = aiResult.revised.gambar ?? payload.gambar ?? null;
+    // Field "gambar": null dari AI berarti pertahankan ilustrasi asli, KECUALI jika
+    // catatan validator secara eksplisit meminta ganti tema/soal secara total (agar gambar lama tidak nyasar).
+    const isTopicReset = /(ganti\s+total|ganti\s+tema|ganti\s+elemen|ganti\s+soal|buat\s+soal\s+baru)/i.test(
+      question.validationNotes || ""
+    );
+    let finalGambar = aiResult.revised.gambar ?? (isTopicReset ? null : payload.gambar) ?? null;
     if (finalGambar && finalGambar.tipe === "diagram") {
       const diagramResult = renderDiagramTemplate({ archetype: finalGambar.archetype, ...(finalGambar.data || {}) });
       if (!diagramResult.svg) {

@@ -22,8 +22,17 @@ export default async function AdminPackageAssignmentPage() {
   const allUsers: User[] = await db.select().from(users);
   const userMap = new Map(allUsers.map((u: User) => [u.id, u]));
 
-  // Ambil pertanyaan & kalkulasi progres tiap paket
-  const allQuestions: Question[] = await db.select().from(questions);
+  // Ambil pertanyaan secara ramping (hanya kolom yang diperlukan untuk kalkulasi progres paket).
+  // DILARANG mengambil seluruh kolom (SELECT *) karena kolom payload berisi gambar base64 (>150 MB)
+  // yang menyebabkan unduhan sangat lambat (80+ detik) dan halaman berputar tanpa henti.
+  const allQuestions = await db
+    .select({
+      id: questions.id,
+      paketId: questions.paketId,
+      nomorUrut: questions.nomorUrut,
+      status: questions.status,
+    })
+    .from(questions);
 
   const enrichedPackages: PackageAdminItem[] = await Promise.all(
     packagesList.map(async (pkg: QuestionPackage) => {

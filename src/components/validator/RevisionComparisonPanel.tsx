@@ -1,9 +1,10 @@
 "use client";
 
 import React from "react";
-import { GitCompare } from "lucide-react";
+import { GitCompare, ClipboardList } from "lucide-react";
 import { LatexPreview } from "@/components/ui/LatexPreview";
 import { GambarIllustration } from "@/components/ui/GambarIllustration";
+import { ValidatorNoteText } from "@/components/ui/ValidatorNoteText";
 
 interface PayloadShape {
   soal_text?: string;
@@ -19,6 +20,7 @@ interface RevisionComparisonPanelProps {
   previous: PayloadShape;
   current: PayloadShape;
   bentukSoal: string;
+  previousValidationNotes?: string | null;
 }
 
 function isEqualField(a: any, b: any): boolean {
@@ -115,7 +117,12 @@ function ComparisonRow({
  * yang benar-benar berubah, agar validator langsung fokus ke bagian yang direvisi
  * tanpa perlu membandingkan sendiri seluruh butir soal secara manual.
  */
-export function RevisionComparisonPanel({ previous, current, bentukSoal }: RevisionComparisonPanelProps) {
+export function RevisionComparisonPanel({
+  previous,
+  current,
+  bentukSoal,
+  previousValidationNotes,
+}: RevisionComparisonPanelProps) {
   const soalChanged = !isEqualField(previous.soal_text, current.soal_text);
   const gambarChanged = !isEqualField(previous.gambar, current.gambar);
   const pembahasanChanged = !isEqualField(previous.pembahasan, current.pembahasan);
@@ -127,14 +134,37 @@ export function RevisionComparisonPanel({ previous, current, bentukSoal }: Revis
     : !isEqualField(previous.opsi, current.opsi) || !isEqualField(previous.kunci_jawaban, current.kunci_jawaban);
 
   const anyChange = soalChanged || gambarChanged || pembahasanChanged || jawabanChanged;
-  if (!anyChange) return null;
+  if (!anyChange && !previousValidationNotes) return null;
 
   return (
     <div className="p-4 bg-indigo-50/60 border border-indigo-200 rounded-xl space-y-4">
-      <div className="flex items-center gap-2 text-xs font-bold text-indigo-900">
-        <GitCompare className="w-4 h-4 text-indigo-600 shrink-0" />
-        <span>Perbandingan Versi Lama vs. Hasil Perbaikan</span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-xs font-bold text-indigo-900">
+          <GitCompare className="w-4 h-4 text-indigo-600 shrink-0" />
+          <span>Perbandingan Versi Lama vs. Hasil Perbaikan</span>
+        </div>
+        {previousValidationNotes && (
+          <span className="text-[10.5px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+            Validasi Pasca-Revisi (Tahap 2)
+          </span>
+        )}
       </div>
+
+      {/* Catatan Revisi Tahap 1 dari Validator */}
+      {previousValidationNotes && (
+        <div className="p-3.5 bg-amber-50/90 border border-amber-300/90 rounded-xl text-xs text-amber-950 space-y-2 shadow-xs">
+          <div className="flex items-center gap-2 font-bold text-amber-900">
+            <ClipboardList className="w-4 h-4 text-amber-700 shrink-0" />
+            <span>Catatan Revisi Validator Sebelumnya (Tahap 1):</span>
+          </div>
+          <div className="bg-white/95 p-3 rounded-lg border border-amber-200 text-slate-800 leading-relaxed font-sans shadow-2xs">
+            <ValidatorNoteText text={previousValidationNotes} />
+          </div>
+          <p className="text-[11px] text-amber-800 font-medium">
+            👉 Silakan periksa apakah seluruh poin perbaikan di atas sudah dipenuhi pada tabel perbandingan perubahan di bawah:
+          </p>
+        </div>
+      )}
 
       <ComparisonRow
         label="Teks Soal"

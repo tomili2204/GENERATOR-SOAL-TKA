@@ -22,8 +22,15 @@ export default async function AdminSiapRilisPage() {
   const allUsers: User[] = await db.select().from(users);
   const userMap = new Map(allUsers.map((u: User) => [u.id, u]));
 
-  // Ambil seluruh pertanyaan untuk menghitung progres 30 butir
-  const allQuestions: Question[] = await db.select().from(questions);
+  // Ambil pertanyaan secara ramping untuk menghitung progres 30 butir (hindari payload 150MB)
+  const allQuestions = await db
+    .select({
+      id: questions.id,
+      paketId: questions.paketId,
+      nomorUrut: questions.nomorUrut,
+      status: questions.status,
+    })
+    .from(questions);
 
   const relevantPackages: SiapRilisPackageItem[] = [];
 

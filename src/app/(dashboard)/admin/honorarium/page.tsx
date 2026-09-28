@@ -29,7 +29,21 @@ export default async function AdminHonorariumPage() {
   // 1. Ambil data dari database
   const allUsers: User[] = await db.select().from(users);
   const allRoles: UserRole[] = await db.select().from(userRoles);
-  const allQuestions: Question[] = await db.select().from(questions);
+  interface SlimHonorariumQuestion {
+    id: string;
+    validatorId: string | null;
+    status: string;
+    paketId: string | null;
+  }
+
+  const allQuestions: SlimHonorariumQuestion[] = await db
+    .select({
+      id: questions.id,
+      validatorId: questions.validatorId,
+      status: questions.status,
+      paketId: questions.paketId,
+    })
+    .from(questions);
   const allPackages: QuestionPackage[] = await db.select().from(questionPackages);
   const allValidationLogs: ValidationLog[] = await db.select().from(validationLogs);
   const allHonorarium: HonorariumRecord[] = await db

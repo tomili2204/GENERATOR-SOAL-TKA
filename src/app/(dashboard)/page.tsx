@@ -34,8 +34,41 @@ export default async function DashboardPage() {
   const isPembuat = hasRole(user, "pembuat_soal");
   const isValidator = hasRole(user, "validator_soal");
 
-  // Ambil metrik ringkasan dari basis data secara efisien
-  const allQuestions: Question[] = await db.select().from(questions);
+  // Ambil metrik ringkasan dari basis data secara efisien tanpa kolom payload base64 (>150MB)
+  const rawQuestions = await db
+    .select({
+      id: questions.id,
+      code: questions.code,
+      nomorUrut: questions.nomorUrut,
+      jenjang: questions.jenjang,
+      mapel: questions.mapel,
+      elemen: questions.elemen,
+      subElemen: questions.subElemen,
+      kompetensi: questions.kompetensi,
+      levelKognitif: questions.levelKognitif,
+      tingkatKesulitan: questions.tingkatKesulitan,
+      bentukSoal: questions.bentukSoal,
+      jenisSoal: questions.jenisSoal,
+      stimulusId: questions.stimulusId,
+      paketId: questions.paketId,
+      sumber: questions.sumber,
+      status: questions.status,
+      authorId: questions.authorId,
+      validatorId: questions.validatorId,
+      validationNotes: questions.validationNotes,
+      validatedAt: questions.validatedAt,
+      temaKonteks: questions.temaKonteks,
+      createdAt: questions.createdAt,
+      updatedAt: questions.updatedAt,
+    })
+    .from(questions);
+
+  const allQuestions: Question[] = rawQuestions.map((q: any) => ({
+    ...q,
+    payload: {},
+    previousPayload: null,
+    previousValidationNotes: null,
+  }));
   const allPackages = await db.select().from(questionPackages).orderBy(desc(questionPackages.createdAt));
   const allUsersList = await db.select({ id: users.id, name: users.name }).from(users);
   const usersMap: Record<string, string> = Object.fromEntries(
@@ -48,12 +81,12 @@ export default async function DashboardPage() {
 
   // Metrik khusus tugas validator (berdasarkan penugasan paket)
   let validatorAssignedPkgs: any[] = [];
-  let validatorAssignedQuestions: Question[] = [];
-  let validatorWaiting: Question[] = [];
-  let validatorApproved: Question[] = [];
-  let validatorRevised: Question[] = [];
-  let validatorCanReview: Question[] = [];
-  let validatorSelfAuthored: Question[] = [];
+  let validatorAssignedQuestions: any[] = [];
+  let validatorWaiting: any[] = [];
+  let validatorApproved: any[] = [];
+  let validatorRevised: any[] = [];
+  let validatorCanReview: any[] = [];
+  let validatorSelfAuthored: any[] = [];
 
   if (isValidator) {
     if (isAdmin) {
