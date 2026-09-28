@@ -4,6 +4,11 @@ import { generateBatchQuestions } from "@/lib/generator/gemini-generator";
 import { normalizeJenjang } from "@/lib/jenjang-utils";
 
 export const dynamic = "force-dynamic";
+// Tanpa ini, Vercel memakai batas durasi default yang jauh lebih pendek dari waktu
+// generate sesungguhnya (4-9 menit untuk 20-30 soal dengan retry validasi & Nano Banana),
+// sehingga trigger manual dari dashboard (tombol "Generate Sekarang") berisiko terputus
+// sebelum selesai -- sama seperti bug paket kosong yang pernah terjadi di jalur cron.
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   try {
