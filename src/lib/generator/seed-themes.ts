@@ -13,13 +13,19 @@ export const INITIAL_THEMES: InitialTheme[] = [
   // --- 16 TEMA AWAL ---
   {
     namaTema: "Maritim & Pesisir Nusantara",
-    subKonteks: ["pelayaran perahu Pinisi", "kedalaman palung laut", "konservasi terumbu karang", "tambak garam", "pasang surut dermaga"],
+    // Diperluas 2026-09: "kedalaman palung laut" (istilah oseanografi berat) diganti aktivitas
+    // yang lebih membumi, agar tidak mengesankan hanya untuk anak pesisir.
+    subKonteks: ["pelabuhan dan kapal nelayan", "tambak garam", "konservasi terumbu karang", "wisata pantai", "pasang surut dermaga"],
     jenjangCocok: ["SD/MI", "SMP/MTs", "SMA/MA", "SMK/MAK"],
     aktif: true,
   },
   {
-    namaTema: "Arsitektur Adat & Geometri Tradisional",
-    subKonteks: ["atap Tongkonan/Rumah Gadang", "simetri candi", "proporsi motif batik"],
+    // Diganti nama dari "Arsitektur Adat & Geometri Tradisional" 2026-09: dulu hanya berisi
+    // bangunan adat yang jarang dilihat langsung oleh sebagian besar siswa; kini bangunan
+    // sehari-hari (gedung sekolah, menara air) jadi contoh utama, arsitektur adat tetap ada
+    // sebagai salah satu variasi.
+    namaTema: "Arsitektur & Geometri Bangunan",
+    subKonteks: ["denah dan gapura sekolah", "menara air/tandon", "simetri candi", "proporsi motif batik", "atap Tongkonan/Rumah Gadang"],
     jenjangCocok: ["SMP/MTs", "SMA/MA", "SMK/MAK"], // Khusus SMP ke atas
     aktif: true,
   },
@@ -42,14 +48,18 @@ export const INITIAL_THEMES: InitialTheme[] = [
     aktif: true,
   },
   {
-    namaTema: "Pangan Tradisional & Kimia/Biologi Lokal",
-    subKonteks: ["fermentasi tempe/tape", "produksi sagu", "minyak kelapa", "gula aren"],
+    // Diganti nama dari "Pangan Tradisional & Kimia/Biologi Lokal" 2026-09: "produksi sagu"
+    // hanya dikenal anak Indonesia Timur; diganti pengolahan pangan yang dikenal nasional.
+    namaTema: "Pengolahan Pangan Sehari-hari",
+    subKonteks: ["pembuatan tahu/tempe", "fermentasi tape", "pembuatan roti/kue", "pembuatan kecap", "minyak kelapa"],
     jenjangCocok: ["SMP/MTs", "SMA/MA", "SMK/MAK"], // Khusus SMP ke atas
     aktif: true,
   },
   {
-    namaTema: "Festival Budaya & Olahraga Nusantara",
-    subKonteks: ["karapan sapi", "tradisi lompat batu", "festival layang-layang"],
+    // Diganti nama dari "Festival Budaya & Olahraga Nusantara" 2026-09: karapan sapi/lompat
+    // batu sangat spesifik satu daerah; ditambah perayaan komunitas yang umum di semua sekolah.
+    namaTema: "Festival & Perayaan Komunitas",
+    subKonteks: ["karnaval 17 Agustus", "pentas seni sekolah", "pasar malam", "karapan sapi", "festival layang-layang"],
     jenjangCocok: ["SD/MI", "SMP/MTs", "SMA/MA", "SMK/MAK"],
     aktif: true,
   },
@@ -60,8 +70,9 @@ export const INITIAL_THEMES: InitialTheme[] = [
     aktif: true,
   },
   {
-    namaTema: "Pertanian & Perikanan",
-    subKonteks: ["hasil panen", "luas lahan", "hasil tangkapan nelayan"],
+    // Digabung dengan "Pertanian & Perkebunan Nusantara" (dulu duplikat) 2026-09.
+    namaTema: "Pertanian, Perkebunan & Perikanan",
+    subKonteks: ["hasil panen padi/jagung", "luas lahan sawah/kebun", "hasil kebun (kopi, teh, cokelat)", "hasil tangkapan nelayan", "pola tanam"],
     jenjangCocok: ["SD/MI", "SMP/MTs", "SMA/MA", "SMK/MAK"],
     aktif: true,
   },
@@ -108,13 +119,8 @@ export const INITIAL_THEMES: InitialTheme[] = [
     aktif: true,
   },
 
-  // --- 8 TEMA BARU ---
-  {
-    namaTema: "Pertanian & Perkebunan Nusantara",
-    subKonteks: ["hasil panen padi/jagung", "luas lahan sawah", "hasil kebun kopi/teh", "pola tanam"],
-    jenjangCocok: ["SD/MI", "SMP/MTs", "SMA/MA", "SMK/MAK"],
-    aktif: true,
-  },
+  // --- 8 TEMA BARU (1 di antaranya, "Pertanian & Perkebunan Nusantara", digabung 2026-09
+  // ke "Pertanian, Perkebunan & Perikanan" di atas karena duplikat) ---
   {
     namaTema: "Peternakan & Perikanan Darat",
     subKonteks: ["jumlah ternak", "produksi telur/susu", "kolam ikan", "kebutuhan pakan ternak"],
@@ -134,8 +140,10 @@ export const INITIAL_THEMES: InitialTheme[] = [
     aktif: true,
   },
   {
-    namaTema: "Seni & Musik Tradisional",
-    subKonteks: ["alat musik daerah", "jadwal latihan sanggar", "penjualan tiket pertunjukan"],
+    // Diganti nama dari "Seni & Musik Tradisional" 2026-09: ditambah kegiatan seni sekolah
+    // modern sebagai contoh utama, musik daerah tetap ada sebagai salah satu variasi.
+    namaTema: "Seni & Pertunjukan Sekolah",
+    subKonteks: ["paduan suara/band sekolah", "lomba tari/vokal", "jadwal latihan sanggar", "alat musik daerah", "penjualan tiket pertunjukan"],
     jenjangCocok: ["SD/MI", "SMP/MTs", "SMA/MA", "SMK/MAK"],
     aktif: true,
   },
