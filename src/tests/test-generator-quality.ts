@@ -2,6 +2,7 @@ import { generateMockGeminiBatchResponse } from "../lib/generator/gemini-generat
 import { buildSystemPrompt } from "../lib/generator/prompt-builder";
 import { validateLatexDelimiters } from "../lib/validations/latex";
 import { generateCompetencySlotPlan, getMathCurriculumElements } from "../lib/generator/competency-plan";
+import { renderDiagramTemplate } from "../lib/generator/diagram-templates";
 
 async function runQualityTests() {
   console.log("==================================================================");
@@ -167,6 +168,34 @@ async function runQualityTests() {
   assert(
     legacyPlan.every((s) => !s.fokus.startsWith("kompetensi pada elemen") && !s.elemen.includes("&")),
     "Legacy '&' element names still resolve to curated focus with official names"
+  );
+
+  // ------------------------------------------------------------------
+  // 6. Diagram garis_bilangan: label titik berdekatan tidak boleh bertumpuk
+  // ------------------------------------------------------------------
+  console.log("\n--- 6. Diagram garis_bilangan: Label Anti-Tumpuk ---");
+  const glResult = renderDiagramTemplate({
+    archetype: "garis_bilangan",
+    min: 0,
+    max: 1,
+    step: 0.25,
+    tanda: [
+      { nilai: 0.25, label: "Tika (1/4 m)" },
+      { nilai: 0.5, label: "Rafi (1/2 m)" },
+      { nilai: 0.75, label: "Galih (3/4 m)" },
+      { nilai: 0.8, label: "Sita (4/5 m)" },
+    ],
+  });
+  assert(Boolean(glResult.svg) && !glResult.error, "garis_bilangan dengan 2 titik berdekatan berhasil dirender");
+  const yPositions = [...(glResult.svg || "").matchAll(/<text x="[\d.]+" y="(-?[\d.]+)" font-size="11" font-weight="700"/g)].map((m) =>
+    Number(m[1])
+  );
+  assert(yPositions.length === 4, `Keempat label titik ter-render (found ${yPositions.length})`);
+  const galihIdx = 2;
+  const sitaIdx = 3;
+  assert(
+    yPositions[galihIdx] !== yPositions[sitaIdx],
+    "Label titik yang berdekatan (3/4 dan 4/5) digeser ke baris berbeda, tidak bertumpuk"
   );
 
   // Summary

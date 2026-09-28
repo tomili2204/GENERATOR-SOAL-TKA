@@ -305,16 +305,38 @@ function renderGarisBilangan(spec: any): DiagramRenderResult {
 
   const marks: string[] = [];
   if (Array.isArray(spec.tanda)) {
-    for (const t of spec.tanda) {
-      if (!t || typeof t.nilai !== "number" || t.nilai < min || t.nilai > max) continue;
+    const validMarks = spec.tanda.filter(
+      (t: any) => t && typeof t.nilai === "number" && t.nilai >= min && t.nilai <= max
+    );
+
+    // Titik yang berdekatan (mis. 3/4 dan 4/5 pada rentang 0-1) membuat label bertumpuk jika
+    // dipaksa sejajar; deteksi lewat perkiraan lebar teks dan geser label yang bertabrakan ke
+    // baris kedua yang lebih tinggi, bergantian dengan label tetangganya.
+    const CHAR_WIDTH_ESTIMATE = 11 * 0.6; // font-size 11 bold
+    const tierByIndex = new Map<number, number>();
+    const sortedByX = validMarks
+      .map((t: any, idx: number) => ({ idx, x: scaleX(t.nilai), label: t.label }))
+      .sort((a: any, b: any) => a.x - b.x);
+    const lastRightByTier = [-Infinity, -Infinity];
+    for (const m of sortedByX) {
+      if (!m.label) continue;
+      const halfWidth = (String(m.label).length * CHAR_WIDTH_ESTIMATE) / 2;
+      const tier = m.x - halfWidth < lastRightByTier[0] ? 1 : 0;
+      lastRightByTier[tier] = Math.max(lastRightByTier[tier], m.x + halfWidth);
+      tierByIndex.set(m.idx, tier);
+    }
+
+    validMarks.forEach((t: any, idx: number) => {
       const x = scaleX(t.nilai);
       marks.push(`<circle cx="${x.toFixed(1)}" cy="${lineY}" r="5.5" fill="#e11d48" stroke="#ffffff" stroke-width="1.5"/>`);
       if (t.label) {
+        const tier = tierByIndex.get(idx) || 0;
+        const y = lineY - 16 - tier * 16;
         marks.push(
-          `<text x="${x.toFixed(1)}" y="${lineY - 16}" font-size="11" font-weight="700" text-anchor="middle" fill="#e11d48" font-family="${FONT}">${escXml(t.label)}</text>`
+          `<text x="${x.toFixed(1)}" y="${y}" font-size="11" font-weight="700" text-anchor="middle" fill="#e11d48" font-family="${FONT}">${escXml(t.label)}</text>`
         );
       }
-    }
+    });
   }
 
   const arrowRight = `<polygon points="${(x1 + 10).toFixed(1)},${lineY} ${x1.toFixed(1)},${(lineY - 5).toFixed(1)} ${x1.toFixed(1)},${(lineY + 5).toFixed(1)}" fill="${INK}"/>`;
