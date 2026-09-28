@@ -676,6 +676,9 @@ export interface GenerateOptions {
   temperature?: number;
   apiKey?: string;
   strictSvgMode?: boolean;
+  /** Menambah soal baru ke paket yang sudah ada (mis. melengkapi paket uji coba 10 soal menjadi 30),
+   * alih-alih membuat paket baru. `startingSlot` adalah nomorUrut pertama untuk soal baru ini. */
+  appendToPackage?: { id: string; code: string; startingSlot: number; targetTotal: number };
 }
 
 export interface GenerationResult {
@@ -1639,48 +1642,55 @@ ${curriculumGuidance}`;
     };
   }
 
-  // 7. Hitung Sequence dan Buat Paket Baru AI (A01-..., A02-...) secara andal tanpa tabrakan kode
+  // 7. Hitung Sequence dan Buat Paket Baru AI (A01-..., A02-...) secara andal tanpa tabrakan kode,
+  // KECUALI bila appendToPackage diisi -- soal baru disambung ke paket yang sudah ada.
   const prefix = "A";
   const jenjangCode = jenjang.split("/")[0].replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
   const mapelCode = mapel.toLowerCase().includes("matematika") ? "MAT" : "BIN";
 
-  // Periksa semua kode paket dan soal yang sudah ada untuk mendapatkan nomor sequence terbesar
-  const existingPkgs = await db.select({ code: questionPackages.code }).from(questionPackages);
-  let maxSeq = 0;
-  const pkgRegex = new RegExp(`^${prefix}(\\d+)-${jenjangCode}-${mapelCode}$`);
-  for (const p of existingPkgs) {
-    if (p.code) {
-      const match = p.code.match(pkgRegex);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (num > maxSeq) maxSeq = num;
+  let packageCode: string;
+  let packageNama: string | undefined;
+  let packageId: string;
+
+  if (options.appendToPackage) {
+    packageId = options.appendToPackage.id;
+    packageCode = options.appendToPackage.code;
+  } else {
+    // Periksa semua kode paket dan soal yang sudah ada untuk mendapatkan nomor sequence terbesar
+    const existingPkgs = await db.select({ code: questionPackages.code }).from(questionPackages);
+    let maxSeq = 0;
+    const pkgRegex = new RegExp(`^${prefix}(\\d+)-${jenjangCode}-${mapelCode}$`);
+    for (const p of existingPkgs) {
+      if (p.code) {
+        const match = p.code.match(pkgRegex);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxSeq) maxSeq = num;
+        }
       }
     }
-  }
 
-  const existingQuestions = await db.select({ code: questions.code }).from(questions);
-  const qRegex = new RegExp(`^${prefix}(\\d+)-${jenjangCode}-${mapelCode}-\\d+$`);
-  for (const q of existingQuestions) {
-    if (q.code) {
-      const match = q.code.match(qRegex);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (num > maxSeq) maxSeq = num;
+    const existingQuestions = await db.select({ code: questions.code }).from(questions);
+    const qRegex = new RegExp(`^${prefix}(\\d+)-${jenjangCode}-${mapelCode}-\\d+$`);
+    for (const q of existingQuestions) {
+      if (q.code) {
+        const match = q.code.match(qRegex);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxSeq) maxSeq = num;
+        }
       }
     }
+
+    const sequenceNumber = maxSeq + 1;
+    const generated = generatePackageCode("ai", sequenceNumber, jenjang, mapel);
+    packageCode = generated.code;
+    packageNama = generated.nama;
+    packageId = `pkg-ai-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
   }
 
-  const sequenceNumber = maxSeq + 1;
-  const { code: packageCode, nama: packageNama } = generatePackageCode(
-    "ai",
-    sequenceNumber,
-    jenjang,
-    mapel
-  );
-
-  const packageId = `pkg-ai-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-
-  // Hitung distribusi bentuk & kesulitan AKTUAL dari soal yang benar-benar tersimpan
+  // Hitung distribusi bentuk & kesulitan AKTUAL dari soal-soal BARU yang benar-benar tersimpan
+  // pada panggilan ini (untuk mode sambung, ini digabung dengan distribusi paket lama di bawah).
   const actualDistBentuk: Record<string, number> = {};
   const actualDistKesulitan: Record<string, number> = {};
 
@@ -1689,7 +1699,9 @@ ${curriculumGuidance}`;
     actualDistKesulitan[vq.tingkat_kesulitan] = (actualDistKesulitan[vq.tingkat_kesulitan] || 0) + 1;
   });
 
-  const packageStatus = validQuestions.length === totalDiminta ? "dalam_validasi" : "draft";
+  const targetTotal = options.appendToPackage?.targetTotal ?? totalDiminta;
+  const finalTotalSoal = (options.appendToPackage?.startingSlot ?? 1) - 1 + validQuestions.length;
+  const packageStatus = finalTotalSoal >= targetTotal ? "dalam_validasi" : "draft";
 
   // 7B. Konversi Ilustrasi Kontekstual Nano Banana Pro (opsional, hanya utk gambar.tipe === "svg")
   // Berlaku sama untuk Trigger Manual maupun Jadwal Cron Otomatis Pagi karena beroperasi di sini,
@@ -1765,25 +1777,51 @@ ${curriculumGuidance}`;
   // 8. Simpan paket + seluruh butir soal valid. Paket sengaja baru dibuat SETELAH langkah
   // Nano Banana yang lambat: bila fungsi serverless terputus (batas durasi Vercel) di tengah
   // pembuatan ilustrasi, tidak ada lagi paket kosong 0/30 yang tertinggal tanpa soal.
-  await db.insert(questionPackages).values({
-    id: packageId,
-    code: packageCode,
-    nama: packageNama,
-    jenjang: jenjang as any,
-    mapel,
-    tipeSumber: "ai",
-    authorId: adminId || "usr-admin-001",
-    jumlahSoal: totalDiminta,
-    distribusiBentukSoal: actualDistBentuk,
-    distribusiKesulitan: actualDistKesulitan,
-    status: packageStatus,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
+  if (options.appendToPackage) {
+    // Mode sambung: paket sudah ada, gabungkan distribusi lama + baru dan perbarui jumlahSoal.
+    const [existingPkg] = await db
+      .select()
+      .from(questionPackages)
+      .where(eq(questionPackages.id, packageId));
+    const mergedDistBentuk: Record<string, number> = { ...(existingPkg?.distribusiBentukSoal as any) };
+    for (const [k, v] of Object.entries(actualDistBentuk)) {
+      mergedDistBentuk[k] = (mergedDistBentuk[k] || 0) + v;
+    }
+    const mergedDistKesulitan: Record<string, number> = { ...(existingPkg?.distribusiKesulitan as any) };
+    for (const [k, v] of Object.entries(actualDistKesulitan)) {
+      mergedDistKesulitan[k] = (mergedDistKesulitan[k] || 0) + v;
+    }
+    await db
+      .update(questionPackages)
+      .set({
+        jumlahSoal: finalTotalSoal,
+        distribusiBentukSoal: mergedDistBentuk,
+        distribusiKesulitan: mergedDistKesulitan,
+        status: packageStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(questionPackages.id, packageId));
+  } else {
+    await db.insert(questionPackages).values({
+      id: packageId,
+      code: packageCode,
+      nama: packageNama,
+      jenjang: jenjang as any,
+      mapel,
+      tipeSumber: "ai",
+      authorId: adminId || "usr-admin-001",
+      jumlahSoal: totalDiminta,
+      distribusiBentukSoal: actualDistBentuk,
+      distribusiKesulitan: actualDistKesulitan,
+      status: packageStatus,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
 
   for (let i = 0; i < validQuestions.length; i++) {
     const vq = validQuestions[i];
-    const slotNumber = i + 1;
+    const slotNumber = (options.appendToPackage?.startingSlot ?? 1) + i;
     const itemCode = `${packageCode}-${slotNumber.toString().padStart(2, "0")}`;
     const questionId = `soal-ai-${Date.now()}-${slotNumber}-${Math.random().toString(36).substring(2, 6)}`;
 
