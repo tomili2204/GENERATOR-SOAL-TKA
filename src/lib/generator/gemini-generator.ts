@@ -677,8 +677,10 @@ export interface GenerateOptions {
   apiKey?: string;
   strictSvgMode?: boolean;
   /** Menambah soal baru ke paket yang sudah ada (mis. melengkapi paket uji coba 10 soal menjadi 30),
-   * alih-alih membuat paket baru. `startingSlot` adalah nomorUrut pertama untuk soal baru ini. */
-  appendToPackage?: { id: string; code: string; startingSlot: number; targetTotal: number };
+   * alih-alih membuat paket baru. `startingSlot` adalah nomorUrut pertama untuk soal baru ini.
+   * Bila `replaceSlots` diisi, soal baru justru MENGGANTI soal lama di nomor-nomor slot tersebut
+   * (soal lama baru dihapus tepat sebelum penggantinya disimpan, setelah lolos validasi). */
+  appendToPackage?: { id: string; code: string; startingSlot: number; targetTotal: number; replaceSlots?: number[] };
 }
 
 export interface GenerationResult {
@@ -1642,6 +1644,12 @@ ${curriculumGuidance}`;
     };
   }
 
+  // Mode ganti slot: jangan simpan lebih banyak soal daripada slot yang akan diganti.
+  const replaceSlots = options.appendToPackage?.replaceSlots;
+  if (replaceSlots && validQuestions.length > replaceSlots.length) {
+    validQuestions.splice(replaceSlots.length);
+  }
+
   // 7. Hitung Sequence dan Buat Paket Baru AI (A01-..., A02-...) secara andal tanpa tabrakan kode,
   // KECUALI bila appendToPackage diisi -- soal baru disambung ke paket yang sudah ada.
   const prefix = "A";
@@ -1689,8 +1697,8 @@ ${curriculumGuidance}`;
     packageId = `pkg-ai-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
   }
 
-  // Hitung distribusi bentuk & kesulitan AKTUAL dari soal-soal BARU yang benar-benar tersimpan
-  // pada panggilan ini (untuk mode sambung, ini digabung dengan distribusi paket lama di bawah).
+  // Hitung distribusi bentuk & kesulitan AKTUAL dari soal yang benar-benar tersimpan. Untuk mode
+  // sambung/ganti slot, distribusi paket dihitung ulang dari database setelah soal disimpan.
   const actualDistBentuk: Record<string, number> = {};
   const actualDistKesulitan: Record<string, number> = {};
 
@@ -1699,9 +1707,7 @@ ${curriculumGuidance}`;
     actualDistKesulitan[vq.tingkat_kesulitan] = (actualDistKesulitan[vq.tingkat_kesulitan] || 0) + 1;
   });
 
-  const targetTotal = options.appendToPackage?.targetTotal ?? totalDiminta;
-  const finalTotalSoal = (options.appendToPackage?.startingSlot ?? 1) - 1 + validQuestions.length;
-  const packageStatus = finalTotalSoal >= targetTotal ? "dalam_validasi" : "draft";
+  const packageStatus = validQuestions.length >= totalDiminta ? "dalam_validasi" : "draft";
 
   // 7B. Konversi Ilustrasi Kontekstual Nano Banana Pro (opsional, hanya utk gambar.tipe === "svg")
   // Berlaku sama untuk Trigger Manual maupun Jadwal Cron Otomatis Pagi karena beroperasi di sini,
@@ -1777,31 +1783,9 @@ ${curriculumGuidance}`;
   // 8. Simpan paket + seluruh butir soal valid. Paket sengaja baru dibuat SETELAH langkah
   // Nano Banana yang lambat: bila fungsi serverless terputus (batas durasi Vercel) di tengah
   // pembuatan ilustrasi, tidak ada lagi paket kosong 0/30 yang tertinggal tanpa soal.
-  if (options.appendToPackage) {
-    // Mode sambung: paket sudah ada, gabungkan distribusi lama + baru dan perbarui jumlahSoal.
-    const [existingPkg] = await db
-      .select()
-      .from(questionPackages)
-      .where(eq(questionPackages.id, packageId));
-    const mergedDistBentuk: Record<string, number> = { ...(existingPkg?.distribusiBentukSoal as any) };
-    for (const [k, v] of Object.entries(actualDistBentuk)) {
-      mergedDistBentuk[k] = (mergedDistBentuk[k] || 0) + v;
-    }
-    const mergedDistKesulitan: Record<string, number> = { ...(existingPkg?.distribusiKesulitan as any) };
-    for (const [k, v] of Object.entries(actualDistKesulitan)) {
-      mergedDistKesulitan[k] = (mergedDistKesulitan[k] || 0) + v;
-    }
-    await db
-      .update(questionPackages)
-      .set({
-        jumlahSoal: finalTotalSoal,
-        distribusiBentukSoal: mergedDistBentuk,
-        distribusiKesulitan: mergedDistKesulitan,
-        status: packageStatus,
-        updatedAt: new Date(),
-      })
-      .where(eq(questionPackages.id, packageId));
-  } else {
+  // Mode sambung/ganti slot: paket sudah ada; jumlah, distribusi, dan statusnya dihitung ulang dari
+  // database SETELAH soal disimpan (lihat di bawah loop), agar soal yang diganti tidak terhitung ganda.
+  if (!options.appendToPackage) {
     await db.insert(questionPackages).values({
       id: packageId,
       code: packageCode,
@@ -1819,10 +1803,20 @@ ${curriculumGuidance}`;
     });
   }
 
+  const replacedStimulusIds = new Set<string>();
+
   for (let i = 0; i < validQuestions.length; i++) {
     const vq = validQuestions[i];
-    const slotNumber = (options.appendToPackage?.startingSlot ?? 1) + i;
+    const slotNumber = replaceSlots ? replaceSlots[i] : (options.appendToPackage?.startingSlot ?? 1) + i;
     const itemCode = `${packageCode}-${slotNumber.toString().padStart(2, "0")}`;
+
+    if (replaceSlots) {
+      const removed = await db
+        .delete(questions)
+        .where(and(eq(questions.paketId, packageId), eq(questions.nomorUrut, slotNumber)))
+        .returning({ stimulusId: questions.stimulusId });
+      removed.forEach((r: { stimulusId: string | null }) => r.stimulusId && replacedStimulusIds.add(r.stimulusId));
+    }
     const questionId = `soal-ai-${Date.now()}-${slotNumber}-${Math.random().toString(36).substring(2, 6)}`;
 
     const checkSim = checkQuestionSimilarity(vq.soal_text, recentMemory.rawStems, 60);
@@ -1871,6 +1865,38 @@ ${curriculumGuidance}`;
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+  }
+
+  if (options.appendToPackage) {
+    const pkgQuestions = await db
+      .select({ bentuk: questions.bentukSoal, tingkat: questions.tingkatKesulitan })
+      .from(questions)
+      .where(eq(questions.paketId, packageId));
+    const distBentuk: Record<string, number> = {};
+    const distKesulitan: Record<string, number> = {};
+    pkgQuestions.forEach((q: { bentuk: string; tingkat: string | null }) => {
+      distBentuk[q.bentuk] = (distBentuk[q.bentuk] || 0) + 1;
+      if (q.tingkat) distKesulitan[q.tingkat] = (distKesulitan[q.tingkat] || 0) + 1;
+    });
+    await db
+      .update(questionPackages)
+      .set({
+        jumlahSoal: pkgQuestions.length,
+        distribusiBentukSoal: distBentuk,
+        distribusiKesulitan: distKesulitan,
+        status: pkgQuestions.length >= options.appendToPackage.targetTotal ? "dalam_validasi" : "draft",
+        updatedAt: new Date(),
+      })
+      .where(eq(questionPackages.id, packageId));
+
+    // Stimulus milik soal yang diganti dihapus bila tidak lagi dipakai soal lain.
+    for (const stimId of replacedStimulusIds) {
+      const [{ n }] = await db
+        .select({ n: count() })
+        .from(questions)
+        .where(eq(questions.stimulusId, stimId));
+      if (Number(n) === 0) await db.delete(stimulus).where(eq(stimulus.id, stimId));
+    }
   }
 
   // 9. Catat Log Audit & Log Generasi
