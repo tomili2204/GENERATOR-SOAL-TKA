@@ -255,23 +255,44 @@ export function validateLanguageTextComplexity(options: {
   const reasons: string[] = [];
   const warnings: string[] = [];
 
-  if (wordCount < criteria.minWords) {
+  // Batas resmi (criteria) tetap yang dikomunikasikan ke AI sebagai target WAJIB. Tapi
+  // menolak total satu stimulus (dan seluruh butir soal yang menempel di dalamnya) hanya
+  // karena meleset tipis dari batas itu ternyata terlalu kaku -- contoh nyata: wacana SD
+  // dengan rata-rata 7,3 kata/kalimat (batas resmi 7) sempat dibuang total beserta 13 soal
+  // di dalamnya. Teks resmi Pusmendik sendiri juga wajar berfluktuasi tipis di sekitar
+  // rata-ratanya. Toleransi di bawah ini HANYA dipakai gerbang validasi, bukan target AI.
+  const WORD_COUNT_TOLERANCE_RATIO = 0.1; // +-10% dari rentang resmi
+  const WORDS_PER_SENTENCE_TOLERANCE = 1; // +-1 kata/kalimat dari rentang resmi
+  const wordMinTolerant = Math.round(criteria.minWords * (1 - WORD_COUNT_TOLERANCE_RATIO));
+  const wordMaxTolerant = Math.round(criteria.maxWords * (1 + WORD_COUNT_TOLERANCE_RATIO));
+  const wpsMinTolerant = criteria.minWordsPerSentence - WORDS_PER_SENTENCE_TOLERANCE;
+  const wpsMaxTolerant = criteria.maxWordsPerSentence + WORDS_PER_SENTENCE_TOLERANCE;
+
+  if (wordCount < wordMinTolerant) {
     reasons.push(
-      `Jumlah kata (${wordCount} kata) KURANG dari batas minimal resmi jenjang ${jenjang} (${criteria.minWords}-${criteria.maxWords} kata). Teks dianggap cacat.`
+      `Jumlah kata (${wordCount} kata) KURANG dari batas minimal jenjang ${jenjang} (${criteria.minWords}-${criteria.maxWords} kata, toleransi hingga ${wordMinTolerant}). Teks dianggap cacat.`
     );
-  } else if (wordCount > criteria.maxWords) {
+  } else if (wordCount > wordMaxTolerant) {
     reasons.push(
-      `Jumlah kata (${wordCount} kata) MELEBIHI batas maksimal resmi jenjang ${jenjang} (${criteria.minWords}-${criteria.maxWords} kata). Teks dianggap cacat.`
+      `Jumlah kata (${wordCount} kata) MELEBIHI batas maksimal jenjang ${jenjang} (${criteria.minWords}-${criteria.maxWords} kata, toleransi hingga ${wordMaxTolerant}). Teks dianggap cacat.`
+    );
+  } else if (wordCount < criteria.minWords || wordCount > criteria.maxWords) {
+    warnings.push(
+      `Jumlah kata (${wordCount} kata) sedikit di luar target resmi jenjang ${jenjang} (${criteria.minWords}-${criteria.maxWords} kata), tapi masih dalam toleransi dan tetap diterima.`
     );
   }
 
-  if (roundedAvgWps < criteria.minWordsPerSentence) {
+  if (roundedAvgWps < wpsMinTolerant) {
     reasons.push(
-      `Rata-rata kata per kalimat (${roundedAvgWps} kata/kalimat) di bawah batas resmi jenjang ${jenjang} (${criteria.minWordsPerSentence}-${criteria.maxWordsPerSentence} kata/kalimat).`
+      `Rata-rata kata per kalimat (${roundedAvgWps} kata/kalimat) di bawah batas jenjang ${jenjang} (${criteria.minWordsPerSentence}-${criteria.maxWordsPerSentence} kata/kalimat, toleransi hingga ${wpsMinTolerant}).`
     );
-  } else if (roundedAvgWps > criteria.maxWordsPerSentence) {
+  } else if (roundedAvgWps > wpsMaxTolerant) {
     reasons.push(
-      `Rata-rata kata per kalimat (${roundedAvgWps} kata/kalimat) melebihi batas resmi jenjang ${jenjang} (${criteria.minWordsPerSentence}-${criteria.maxWordsPerSentence} kata/kalimat).`
+      `Rata-rata kata per kalimat (${roundedAvgWps} kata/kalimat) melebihi batas jenjang ${jenjang} (${criteria.minWordsPerSentence}-${criteria.maxWordsPerSentence} kata/kalimat, toleransi hingga ${wpsMaxTolerant}).`
+    );
+  } else if (roundedAvgWps < criteria.minWordsPerSentence || roundedAvgWps > criteria.maxWordsPerSentence) {
+    warnings.push(
+      `Rata-rata kata per kalimat (${roundedAvgWps} kata/kalimat) sedikit di luar target resmi jenjang ${jenjang} (${criteria.minWordsPerSentence}-${criteria.maxWordsPerSentence} kata/kalimat), tapi masih dalam toleransi dan tetap diterima.`
     );
   }
 

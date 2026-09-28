@@ -172,6 +172,35 @@ Burung camar kerap singgah bertengger di ranting pohon.`;
   console.log(`SMA/MA Aktual: ${smaTestRes.wordCount} kata, ${smaTestRes.avgWordsPerSentence} kata/kalimat`);
   assert(smaTestRes.valid, `SMA/MA stimulus valid (${smaTestRes.wordCount} kata, rata-rata ${smaTestRes.avgWordsPerSentence})`);
 
+  // 6. Uji toleransi baru: wacana SD sedikit di atas batas resmi (7 kata/kalimat) tapi masih
+  // dalam toleransi (+-1) HARUS tetap diterima (dengan peringatan), tidak ditolak total.
+  console.log("\n--- Kasus 6: Toleransi Rata-rata Kata/Kalimat (SD/MI, sedikit di atas batas) ---");
+  const sdSentence8Words = "Budi dan teman-temannya bermain bola di lapangan sekolah.";
+  const sdToleranceText = Array(24).fill(sdSentence8Words).join(" ");
+  const sdToleranceRes = validateLanguageTextComplexity({
+    rawJenjang: "SD/MI",
+    mapel: "Bahasa Indonesia",
+    text: sdToleranceText,
+  });
+  console.log(`Aktual: ${sdToleranceRes.wordCount} kata, ${sdToleranceRes.avgWordsPerSentence} kata/kalimat (batas resmi 3-7, toleransi hingga 8)`);
+  assert(sdToleranceRes.valid, "Wacana SD dengan rata-rata 8 kata/kalimat (batas resmi 7) DITERIMA karena masih dalam toleransi +-1");
+  assert(
+    sdToleranceRes.warnings.some((w) => w.includes("sedikit di luar target resmi")),
+    "Memuat peringatan (bukan penolakan) karena sedikit di luar target resmi"
+  );
+
+  // 7. Wacana yang MELEBIHI toleransi (bukan cuma target resmi) tetap harus ditolak.
+  console.log("\n--- Kasus 7: Melebihi Batas Toleransi (SD/MI) ---");
+  const sdSentence10Words = "Budi dan teman-teman sekelasnya bermain bola kaki di lapangan.";
+  const sdBeyondToleranceText = Array(20).fill(sdSentence10Words).join(" ");
+  const sdBeyondRes = validateLanguageTextComplexity({
+    rawJenjang: "SD/MI",
+    mapel: "Bahasa Indonesia",
+    text: sdBeyondToleranceText,
+  });
+  console.log(`Aktual: ${sdBeyondRes.wordCount} kata, ${sdBeyondRes.avgWordsPerSentence} kata/kalimat`);
+  assert(!sdBeyondRes.valid, "Wacana yang melebihi batas TERMASUK toleransi tetap DITOLAK");
+
   console.log(`\nHASIL AKHIR: ${passed} Passed, ${failed} Failed.`);
   if (failed > 0) process.exit(1);
 }
