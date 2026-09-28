@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { TemaKonteksPoolItem } from "@/db/schema";
+import { getMathCurriculumElements } from "@/lib/generator/competency-plan";
 
 // ── MATRIKS RESMI ELEMEN & SUB-ELEMEN KURIKULUM PUSMENDIK / BSKAP ────────────
 export interface ElementDefinition {
@@ -29,51 +30,10 @@ export interface ElementDefinition {
   description?: string;
 }
 
+// Elemen Matematika TIDAK didefinisikan di sini: diambil dari competency-plan.ts
+// (getMathCurriculumElements) agar nama yang dipilih admin selalu cocok persis dengan
+// rencana kompetensi yang dikirim ke AI. Daftar di bawah hanya untuk Bahasa Indonesia.
 const CURRICULUM_ELEMENTS: Record<string, ElementDefinition[]> = {
-  "SD/MI__Matematika": [
-    {
-      name: "Bilangan",
-      subElements: ["Bilangan Rasional & Pecahan", "Bilangan Cacah Besar", "KPK & FPB"],
-      description: "Pecahan biasa/desimal/persen, perbandingan pecahan, operasi bertingkat bilangan cacah, dan FPB/KPK.",
-    },
-    {
-      name: "Geometri & Pengukuran",
-      subElements: ["Objek Geometri (Bangun Datar/Ruang)", "Luas Gabungan Berarsir", "Volume Balok & Kubus", "Konversi Satuan Baku"],
-      description: "Sifat bangun datar, keliling & luas berarsir, volume wadah berongga, dan satuan baku.",
-    },
-    {
-      name: "Aljabar",
-      subElements: ["Pola Konfigurasi Objek", "Barisan Bilangan", "Kalimat Terbuka Sederhana"],
-      description: "Pola barisan membesar/mengecil, hubungan kesetaraan, dan kalimat matematika terbuka.",
-    },
-    {
-      name: "Data & Peluang",
-      subElements: ["Penyajian Data (Tabel/Diagram Batang)", "Mean & Modus Data Tunggal", "Piktogram"],
-      description: "Tabel frekuensi, diagram batang, diagram garis, rata-rata gabungan, dan modus.",
-    },
-  ],
-  "SMP/MTs__Matematika": [
-    {
-      name: "Bilangan",
-      subElements: ["Bilangan Real & Operasi Bertanda", "Eksponen & Bentuk Akar", "Rasio & Skala Bertingkat", "Perbandingan Berbalik Nilai"],
-      description: "Operasi bilangan bertanda (aturan skor/suhu), bilangan berpangkat, notasi ilmiah, dan perbandingan.",
-    },
-    {
-      name: "Aljabar",
-      subElements: ["SPLDV & PLSV Kontekstual", "Bentuk Aljabar & Pemfaktoran", "Relasi & Rumus Fungsi f(x)", "Barisan & Deret Aritmetika/Geometri"],
-      description: "Sistem persamaan dua variabel (tarif/belanja), relasi fungsi linear/kuadrat, dan pola deret.",
-    },
-    {
-      name: "Geometri & Pengukuran",
-      subElements: ["Teorema Pythagoras", "Sudut Garis Transversal", "Luas Bangun Datar Berarsir", "Volume & Luas Prisma, Limas, Bola"],
-      description: "Pythagoras kontekstual (jarak kapal/tiang), sudut garis sejajar, serta geometri ruang.",
-    },
-    {
-      name: "Data & Peluang",
-      subElements: ["Statistika Mean Gabungan", "Diagram Lingkaran & Kuartil", "Peluang Kejadian Tunggal"],
-      description: "Analisis data mean gabungan data baru, ukuran pemusatan kuartil, dan peluang kejadian.",
-    },
-  ],
   "SD/MI__Bahasa Indonesia": [
     {
       name: "Teks Informasi",
@@ -126,23 +86,6 @@ const CURRICULUM_ELEMENTS: Record<string, ElementDefinition[]> = {
       name: "Evaluasi & Refleksi",
       subElements: ["Fakta vs Opini", "Keabsahan Argumen Penulis", "Evaluasi Data & Deteksi Bias"],
       description: "Menguji validitas penalaran penulis, mendeteksi opini tersembunyi, dan keabsahan fakta wacana.",
-    },
-  ],
-  "SMA/MA__Matematika": [
-    {
-      name: "Aljabar",
-      subElements: ["SPLTV Kontekstual", "Program Linear & Optimasi", "Polinomial & Fungsi Lanjutan"],
-      description: "Sistem persamaan 3 variabel, optimasi fungsi objektif, dan aljabar tingkat lanjut.",
-    },
-    {
-      name: "Geometri & Pengukuran",
-      subElements: ["Dimensi Tiga (Jarak Titik/Garis/Bidang)", "Trigonometri Sudut Elevasi/Depresi"],
-      description: "Geometri ruang dimensi tiga dan aplikasi trigonometri kontekstual.",
-    },
-    {
-      name: "Data & Peluang",
-      subElements: ["Statistika Data Kelompok", "Peluang Kejadian Majemuk Saling Lepas/Bebas"],
-      description: "Analisis distribusi frekuensi kelompok dan peluang gabungan bersyarat.",
     },
   ],
   "SMA/MA__Bahasa Indonesia": [
@@ -226,6 +169,9 @@ export function FlexibleGeneratorStudio({
   // ── Elemen / Materi Kurikulum State ─────────────────────────────────────────
   const curriculumKey = `${jenjang}__${mapel}`;
   const defaultElementsForSubject: ElementDefinition[] = useMemo(() => {
+    if (mapel.toLowerCase().includes("matematika")) {
+      return getMathCurriculumElements(jenjang);
+    }
     return (
       CURRICULUM_ELEMENTS[curriculumKey] ||
       CURRICULUM_ELEMENTS[`SD/MI__${mapel}`] || [

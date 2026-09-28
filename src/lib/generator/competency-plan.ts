@@ -6,6 +6,11 @@
  * dan angka dibebaskan ke model agar mengikuti gaya soal resmi — pengalaman sebelumnya
  * menunjukkan mewajibkan skenario/profesi per slot justru menghasilkan cerita tempelan
  * dan klise baru.
+ *
+ * Tabel di bawah juga menjadi SATU-SATUNYA sumber daftar elemen Matematika yang ditampilkan
+ * di Studio Generator (getMathCurriculumElements), agar nama elemen yang dipilih admin selalu
+ * cocok persis dengan tabel ini. Nama elemen mengikuti kerangka asesmen resmi TKA
+ * (mis. SD/MI: Bilangan, Geometri dan Pengukuran, Data — tanpa Aljabar).
  */
 
 export interface SlotPlan {
@@ -17,6 +22,7 @@ export interface SlotPlan {
 interface ElementFocus {
   elemen: string;
   bobot: number;
+  deskripsi: string;
   fokus: string[];
 }
 
@@ -24,6 +30,7 @@ const FOKUS_SD: ElementFocus[] = [
   {
     elemen: "Bilangan",
     bobot: 0.35,
+    deskripsi: "Pecahan, desimal, persen, operasi hitung bilangan cacah, serta kelipatan, faktor, KPK, dan FPB.",
     fokus: [
       "operasi hitung pecahan (penjumlahan, pengurangan, perkalian, pembagian)",
       "operasi pecahan dengan bilangan asli",
@@ -38,6 +45,7 @@ const FOKUS_SD: ElementFocus[] = [
   {
     elemen: "Geometri dan Pengukuran",
     bobot: 0.5,
+    deskripsi: "Sifat bangun datar dan bangun ruang, keliling, luas, volume, satuan baku, waktu, kecepatan, dan sudut.",
     fokus: [
       "sifat-sifat bangun datar",
       "visualisasi bangun ruang (tampak depan/atas/samping, jaring-jaring, kubus satuan)",
@@ -55,6 +63,7 @@ const FOKUS_SD: ElementFocus[] = [
   {
     elemen: "Data",
     bobot: 0.15,
+    deskripsi: "Membaca dan menyajikan data dalam tabel, diagram batang, atau piktogram, serta rata-rata dan modus.",
     fokus: [
       "membaca informasi dari diagram batang atau piktogram",
       "menyajikan data dalam tabel atau diagram",
@@ -67,6 +76,7 @@ const FOKUS_SMP: ElementFocus[] = [
   {
     elemen: "Bilangan",
     bobot: 0.35,
+    deskripsi: "Bilangan bulat dan real, perbandingan, rasio dan skala, bilangan berpangkat, bentuk akar, notasi ilmiah, dan aritmetika sosial.",
     fokus: [
       "operasi bilangan bulat dengan urutan operasi",
       "estimasi hasil operasi bilangan real",
@@ -82,6 +92,7 @@ const FOKUS_SMP: ElementFocus[] = [
   {
     elemen: "Aljabar",
     bobot: 0.2,
+    deskripsi: "Bentuk aljabar, persamaan dan pertidaksamaan linear, SPLDV, relasi dan fungsi, serta pola dan barisan.",
     fokus: [
       "penyederhanaan bentuk aljabar (sifat komutatif, asosiatif, distributif)",
       "persamaan linear satu variabel",
@@ -95,6 +106,7 @@ const FOKUS_SMP: ElementFocus[] = [
   {
     elemen: "Geometri dan Pengukuran",
     bobot: 0.3,
+    deskripsi: "Sudut dan garis sejajar, teorema Pythagoras, kesebangunan, luas bangun datar, bangun ruang, dan transformasi.",
     fokus: [
       "sudut pada dua garis sejajar yang dipotong garis transversal",
       "teorema Pythagoras",
@@ -108,6 +120,7 @@ const FOKUS_SMP: ElementFocus[] = [
   {
     elemen: "Data dan Peluang",
     bobot: 0.15,
+    deskripsi: "Membaca diagram, ukuran pemusatan dan jangkauan data, serta peluang empiris dan teoretis.",
     fokus: [
       "membaca dan menafsirkan diagram batang, garis, atau lingkaran",
       "mean, median, modus, dan jangkauan",
@@ -122,6 +135,7 @@ const FOKUS_SMA: ElementFocus[] = [
   {
     elemen: "Aljabar",
     bobot: 0.4,
+    deskripsi: "SPLTV, program linear, fungsi kuadrat, eksponen dan logaritma, barisan dan deret, serta komposisi dan invers fungsi.",
     fokus: [
       "sistem persamaan linear tiga variabel",
       "program linear",
@@ -134,6 +148,7 @@ const FOKUS_SMA: ElementFocus[] = [
   {
     elemen: "Geometri dan Pengukuran",
     bobot: 0.3,
+    deskripsi: "Trigonometri, aturan sinus dan cosinus, jarak pada bangun ruang, serta luas permukaan dan volume.",
     fokus: [
       "trigonometri pada segitiga siku-siku",
       "aturan sinus dan aturan cosinus",
@@ -144,6 +159,7 @@ const FOKUS_SMA: ElementFocus[] = [
   {
     elemen: "Data dan Peluang",
     bobot: 0.3,
+    deskripsi: "Ukuran pemusatan dan penyebaran data, data berkelompok, kaidah pencacahan, dan peluang kejadian majemuk.",
     fokus: [
       "ukuran pemusatan dan penyebaran data",
       "penyajian dan interpretasi data berkelompok",
@@ -163,6 +179,26 @@ function shuffled<T>(list: T[]): T[] {
   return [...list].sort(() => 0.5 - Math.random());
 }
 
+/** "Geometri & Pengukuran" dan "geometri dan pengukuran" dianggap nama elemen yang sama. */
+export function normalizeElemenName(name: string): string {
+  return name.toLowerCase().replace(/&/g, " dan ").replace(/\s+/g, " ").trim();
+}
+
+export interface MathCurriculumElement {
+  name: string;
+  description: string;
+  subElements: string[];
+}
+
+/** Daftar elemen Matematika resmi per jenjang untuk ditampilkan di Studio Generator. */
+export function getMathCurriculumElements(jenjang: string): MathCurriculumElement[] {
+  return focusTableFor(jenjang).map((el) => ({
+    name: el.elemen,
+    description: el.deskripsi,
+    subElements: el.fokus,
+  }));
+}
+
 /**
  * Membagi totalSoal ke elemen sesuai bobot (metode sisa terbesar), lalu memberi tiap butir
  * satu fokus kompetensi yang digilir dari daftar teracak — agar satu paket tidak menguji
@@ -180,10 +216,11 @@ export function generateCompetencySlotPlan(
   const elements: ElementFocus[] =
     selectedElements && selectedElements.length > 0
       ? selectedElements.map((name) => {
-          const match = table.find((t) => t.elemen.toLowerCase() === name.toLowerCase());
+          const match = table.find((t) => normalizeElemenName(t.elemen) === normalizeElemenName(name));
           return {
-            elemen: name,
+            elemen: match ? match.elemen : name,
             bobot: 1 / selectedElements.length,
+            deskripsi: match ? match.deskripsi : "",
             fokus: match ? match.fokus : [`kompetensi pada elemen ${name}`],
           };
         })

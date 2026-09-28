@@ -21,7 +21,7 @@ import { normalizeJenjang } from "@/lib/jenjang-utils";
 import { validateLanguageTextComplexity, isLanguageSubject, countWords, formatWacanaCriteriaText } from "./text-complexity";
 import { jsonrepair } from "jsonrepair";
 import { fetchRecentQuestionsMemory } from "./sliding-window-memory";
-import { generateCompetencySlotPlan, formatCompetencyPlanPrompt } from "./competency-plan";
+import { generateCompetencySlotPlan, formatCompetencyPlanPrompt, normalizeElemenName } from "./competency-plan";
 import { buildSystemPrompt } from "./prompt-builder";
 import {
   evaluateBatchSimilarity,
@@ -1848,7 +1848,8 @@ ${curriculumGuidance}`;
       nomorUrut: slotNumber,
       jenjang: jenjang as any,
       mapel,
-      elemen: (options.elementMode === "selective" && options.selectedElements && options.selectedElements.length > 0 && !options.selectedElements.includes(vq.elemen))
+      elemen: (options.elementMode === "selective" && options.selectedElements && options.selectedElements.length > 0 &&
+        !options.selectedElements.some((el) => normalizeElemenName(el) === normalizeElemenName(vq.elemen || "")))
         ? options.selectedElements[i % options.selectedElements.length]
         : vq.elemen,
       subElemen: vq.sub_elemen,

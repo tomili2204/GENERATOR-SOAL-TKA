@@ -1,6 +1,7 @@
 import { generateMockGeminiBatchResponse } from "../lib/generator/gemini-generator";
 import { buildSystemPrompt } from "../lib/generator/prompt-builder";
 import { validateLatexDelimiters } from "../lib/validations/latex";
+import { generateCompetencySlotPlan, getMathCurriculumElements } from "../lib/generator/competency-plan";
 
 async function runQualityTests() {
   console.log("==================================================================");
@@ -144,6 +145,29 @@ async function runQualityTests() {
   assert(indoQuestions.length === 30, `Generates 30 Bahasa Indonesia questions (found ${indoQuestions.length})`);
   assert(indoQuestions.some((q: any) => q.level_kognitif === "Pemahaman Inferensial"), "Contains Pemahaman Inferensial level");
   assert(indoQuestions.some((q: any) => q.level_kognitif === "Evaluasi dan Apresiasi"), "Contains Evaluasi dan Apresiasi level");
+
+  // ------------------------------------------------------------------
+  // 5. Elemen Kurikulum Matematika: UI Studio & rencana kompetensi satu sumber
+  // ------------------------------------------------------------------
+  console.log("\n--- 5. Math Curriculum Elements (UI <-> Competency Plan) ---");
+  const sdElements = getMathCurriculumElements("SD/MI").map((e) => e.name);
+  assert(
+    JSON.stringify(sdElements) === JSON.stringify(["Bilangan", "Geometri dan Pengukuran", "Data"]),
+    `SD/MI math elements follow official framework without Aljabar (found ${sdElements.join(", ")})`
+  );
+  for (const jenjang of ["SD/MI", "SMP/MTs", "SMA/MA"]) {
+    const names = getMathCurriculumElements(jenjang).map((e) => e.name);
+    const plan = generateCompetencySlotPlan(30, jenjang, "Matematika", names);
+    assert(
+      plan.length === 30 && plan.every((s) => !s.fokus.startsWith("kompetensi pada elemen")),
+      `${jenjang}: every element selectable in Studio maps to a curated competency focus`
+    );
+  }
+  const legacyPlan = generateCompetencySlotPlan(10, "SMP/MTs", "Matematika", ["Geometri & Pengukuran", "Data & Peluang"]);
+  assert(
+    legacyPlan.every((s) => !s.fokus.startsWith("kompetensi pada elemen") && !s.elemen.includes("&")),
+    "Legacy '&' element names still resolve to curated focus with official names"
+  );
 
   // Summary
   console.log("\n==================================================================");
