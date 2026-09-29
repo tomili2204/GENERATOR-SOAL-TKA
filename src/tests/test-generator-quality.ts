@@ -3,6 +3,7 @@ import { buildSystemPrompt } from "../lib/generator/prompt-builder";
 import { validateLatexDelimiters } from "../lib/validations/latex";
 import { generateCompetencySlotPlan, getMathCurriculumElements } from "../lib/generator/competency-plan";
 import { renderDiagramTemplate } from "../lib/generator/diagram-templates";
+// (import digabung dengan pemakaian di atas untuk uji sudut_transversal di bagian 7)
 
 async function runQualityTests() {
   console.log("==================================================================");
@@ -197,6 +198,63 @@ async function runQualityTests() {
     yPositions[galihIdx] !== yPositions[sitaIdx],
     "Label titik yang berdekatan (3/4 dan 4/5) digeser ke baris berbeda, tidak bertumpuk"
   );
+
+  // ------------------------------------------------------------------
+  // 7. Diagram sudut_transversal: geometri presisi (bukan digambar bebas oleh AI)
+  // ------------------------------------------------------------------
+  console.log("\n--- 7. Diagram sudut_transversal: Presisi Geometris ---");
+
+  // Kasus nyata yang dilaporkan pengguna: A28-SMP-MAT-09. Sudut A = 115 derajat di kuadran
+  // atas_kanan garis 1; sudut B sehadap (kuadran sama, garis 2) seharusnya PERSIS 115 derajat.
+  const sudutCase1 = renderDiagramTemplate({
+    archetype: "sudut_transversal",
+    labelGaris1: "p",
+    labelGaris2: "q",
+    sudutDiketahui: { diGaris: 1, posisi: "atas_kanan", label: "∠A", nilaiDerajat: 115 },
+    sudutLain: [{ diGaris: 2, posisi: "atas_kanan", label: "∠B", tampilkanNilai: true }],
+  });
+  assert(Boolean(sudutCase1.svg) && !sudutCase1.error, "sudut_transversal kasus sehadap berhasil dirender");
+  assert(
+    (sudutCase1.svg || "").includes("∠B = 115°"),
+    "Sudut sehadap (kuadran sama di garis lain) dihitung TEPAT sama besar dengan sudut diketahui, bukan digambar bebas"
+  );
+
+  // Sudut berpelurus (kuadran "lawan" di garis yang SAMA) harus 180 - 115 = 65 derajat.
+  const sudutCase2 = renderDiagramTemplate({
+    archetype: "sudut_transversal",
+    sudutDiketahui: { diGaris: 1, posisi: "atas_kanan", label: "∠A", nilaiDerajat: 115 },
+    sudutLain: [{ diGaris: 1, posisi: "atas_kiri", label: "∠C", tampilkanNilai: true }],
+  });
+  assert(
+    (sudutCase2.svg || "").includes("∠C = 65°"),
+    "Sudut berpelurus (kuadran bersebelahan, garis sama) dihitung TEPAT 180 - sudut diketahui"
+  );
+
+  // Sudut yang ditanyakan (tampilkanNilai: false) tidak boleh membocorkan angka jawabannya.
+  const sudutCase3 = renderDiagramTemplate({
+    archetype: "sudut_transversal",
+    sudutDiketahui: { diGaris: 1, posisi: "atas_kanan", label: "∠A", nilaiDerajat: 115 },
+    sudutLain: [{ diGaris: 2, posisi: "atas_kanan", label: "∠B", tampilkanNilai: false }],
+  });
+  assert(
+    (sudutCase3.svg || "").includes(">∠B<") && !(sudutCase3.svg || "").includes("∠B = 115"),
+    "Sudut yang ditanyakan (tampilkanNilai: false) hanya menampilkan nama sudut, tidak nilainya"
+  );
+
+  // Validasi: posisi tidak dikenal, nilai derajat di luar rentang, dan sudut transversal terlalu
+  // ekstrem (nyaris berimpit dengan garis sejajar) wajib ditolak dengan pesan error, bukan diam-diam
+  // menggambar sesuatu yang tidak masuk akal.
+  const sudutInvalidPos = renderDiagramTemplate({
+    archetype: "sudut_transversal",
+    sudutDiketahui: { diGaris: 1, posisi: "tengah", label: "∠A", nilaiDerajat: 90 },
+  });
+  assert(!sudutInvalidPos.svg && Boolean(sudutInvalidPos.error), "sudut_transversal menolak posisi kuadran yang tidak dikenal");
+
+  const sudutExtreme = renderDiagramTemplate({
+    archetype: "sudut_transversal",
+    sudutDiketahui: { diGaris: 1, posisi: "atas_kanan", label: "∠A", nilaiDerajat: 5 },
+  });
+  assert(!sudutExtreme.svg && Boolean(sudutExtreme.error), "sudut_transversal menolak sudut transversal yang terlalu landai/ekstrem untuk digambar terbaca");
 
   // Summary
   console.log("\n==================================================================");

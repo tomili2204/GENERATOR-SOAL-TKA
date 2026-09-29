@@ -492,7 +492,7 @@ export function getStrictSvgPromptInstructions(jenjang: string, mapel: string): 
 
   return `\n\nMODE VISUAL KETAT AKTIF: sekitar sepertiga butir dalam batch ini wajib memiliki "gambar" (tidak null), mengikuti aturan ILUSTRASI di atas.
 ${isMat ? `- Data dan peluang: sajikan data dengan template diagram_batang atau diagram_lingkaran (tabel Markdown boleh sebagai pelengkap).
-- Geometri dan pengukuran: SVG bangun datar/ruang, denah, atau jaring-jaring dengan label ukuran yang proporsional.
+- Geometri dan pengukuran: SVG bangun datar/ruang, denah, atau jaring-jaring dengan label ukuran yang proporsional. Khusus sudut pada dua garis sejajar dipotong transversal, WAJIB pakai template archetype "sudut_transversal" (lihat aturan ILUSTRASI), jangan SVG bebas.
 - Bilangan: ${isSd ? "template model_pecahan (lingkaran atau persegi panjang berarsir) untuk pecahan, dan garis_bilangan untuk urutan atau operasi bilangan." : "template garis_bilangan untuk bilangan bertanda atau urutan bilangan."}` : `- Teks informasi yang memuat persentase atau perbandingan: template diagram_lingkaran atau diagram_batang.
 - Teks prosedur: SVG bagan alur langkah kerja yang sederhana.`}
 - SVG memakai viewBox="0 0 480 300", width="100%", font-family="system-ui, sans-serif", ukuran huruf minimal 12, dan warna yang ramah mata (mis. #4f46e5, #059669, #d97706, #475569, latar #f8fafc).`;

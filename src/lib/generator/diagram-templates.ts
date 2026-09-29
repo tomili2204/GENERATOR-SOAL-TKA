@@ -37,7 +37,22 @@ export interface GarisBilanganSpec {
   tanda?: Array<{ nilai: number; label?: string }>;
 }
 
-export type DiagramSpec = DiagramBatangSpec | DiagramLingkaranSpec | ModelPecahanSpec | GarisBilanganSpec;
+export type SudutPosisi = "atas_kiri" | "atas_kanan" | "bawah_kiri" | "bawah_kanan";
+
+export interface SudutTransversalSpec {
+  archetype: "sudut_transversal";
+  labelGaris1?: string;
+  labelGaris2?: string;
+  sudutDiketahui: { diGaris: 1 | 2; posisi: SudutPosisi; label: string; nilaiDerajat: number };
+  sudutLain?: Array<{ diGaris: 1 | 2; posisi: SudutPosisi; label: string; tampilkanNilai?: boolean }>;
+}
+
+export type DiagramSpec =
+  | DiagramBatangSpec
+  | DiagramLingkaranSpec
+  | ModelPecahanSpec
+  | GarisBilanganSpec
+  | SudutTransversalSpec;
 
 export interface DiagramRenderResult {
   svg: string | null;
@@ -346,6 +361,141 @@ function renderGarisBilangan(spec: any): DiagramRenderResult {
   return { svg: wrapSvg(W, H, `${mainLine}${arrowLeft}${arrowRight}${ticks.join("")}${marks.join("")}`), error: null };
 }
 
+// Sudut yang terbentuk pada TITIK MANA PUN sepanjang satu garis transversal yang sama memotong
+// dua garis sejajar horizontal hanya bisa bernilai theta (sudut lancip transversal terhadap
+// garis mendatar) atau (180-theta) -- inilah yang membuat sudut sehadap/berseberangan selalu
+// sama besar dan sudut sepihak selalu berpelurus. Tabel ini memetakan tiap kuadran ke rumus
+// nilainya, sehingga HANYA SATU angka (derajat sudut yang diketahui) perlu diberikan dan
+// seluruh sudut lain pada diagram otomatis presisi secara geometris, tidak lagi digambar bebas.
+const SUDUT_QUADRANTS: Record<SudutPosisi, { rays: ["kanan" | "kiri", "atas" | "bawah"]; value: (theta: number) => number }> = {
+  atas_kanan: { rays: ["kanan", "atas"], value: (theta) => theta },
+  atas_kiri: { rays: ["kiri", "atas"], value: (theta) => 180 - theta },
+  bawah_kanan: { rays: ["kanan", "bawah"], value: (theta) => 180 - theta },
+  bawah_kiri: { rays: ["kiri", "bawah"], value: (theta) => theta },
+};
+
+function sudutRayDir(which: "kanan" | "kiri" | "atas" | "bawah", thetaRad: number): [number, number] {
+  switch (which) {
+    case "kanan":
+      return [1, 0];
+    case "kiri":
+      return [-1, 0];
+    case "atas":
+      return [Math.cos(thetaRad), -Math.sin(thetaRad)];
+    case "bawah":
+      return [-Math.cos(thetaRad), Math.sin(thetaRad)];
+  }
+}
+
+/** Poligon (bukan elliptical arc SVG) yang mendekati busur sudut lewat rute sudut TERPENDEK
+ * antara dua sinar -- menghindari kerumitan/kesalahan arah large-arc-flag & sweep-flag. */
+function sudutArcPath(vx: number, vy: number, r: number, dirA: [number, number], dirB: [number, number]): string {
+  const a1 = Math.atan2(dirA[1], dirA[0]);
+  const a2 = Math.atan2(dirB[1], dirB[0]);
+  let delta = a2 - a1;
+  while (delta > Math.PI) delta -= 2 * Math.PI;
+  while (delta <= -Math.PI) delta += 2 * Math.PI;
+  const segments = 16;
+  const pts: string[] = [];
+  for (let i = 0; i <= segments; i++) {
+    const a = a1 + (delta * i) / segments;
+    pts.push(`${(vx + r * Math.cos(a)).toFixed(1)},${(vy + r * Math.sin(a)).toFixed(1)}`);
+  }
+  return `M ${pts[0]} L ${pts.slice(1).join(" L ")}`;
+}
+
+function renderSudutTransversal(spec: any): DiagramRenderResult {
+  const known = spec.sudutDiketahui;
+  if (!known || typeof known.nilaiDerajat !== "number" || !SUDUT_QUADRANTS[known.posisi as SudutPosisi]) {
+    return { svg: null, error: "sudut_transversal wajib memiliki sudutDiketahui.nilaiDerajat (angka) dan posisi yang valid." };
+  }
+  if (known.nilaiDerajat <= 0 || known.nilaiDerajat >= 180) {
+    return { svg: null, error: "sudut_transversal.sudutDiketahui.nilaiDerajat wajib di antara 0 dan 180 derajat." };
+  }
+
+  // theta = sudut lancip/tumpul transversal terhadap garis mendatar, DITURUNKAN dari sudut yang
+  // diketahui (bukan input terpisah) supaya tidak mungkin ada dua angka yang saling bertentangan.
+  const knownQuadrant = SUDUT_QUADRANTS[known.posisi as SudutPosisi];
+  const theta = known.posisi === "atas_kanan" || known.posisi === "bawah_kiri" ? known.nilaiDerajat : 180 - known.nilaiDerajat;
+  if (theta < 30 || theta > 150) {
+    return {
+      svg: null,
+      error: "sudut_transversal: kemiringan garis transversal hasil hitung (30-150 derajat terhadap garis mendatar) di luar rentang yang bisa digambar terbaca. Pilih sudutDiketahui yang lain.",
+    };
+  }
+  const thetaRad = (theta * Math.PI) / 180;
+
+  const allMarks: Array<{ diGaris: 1 | 2; posisi: SudutPosisi; label: string; nilaiDerajat: number | null }> = [
+    { diGaris: known.diGaris, posisi: known.posisi, label: known.label, nilaiDerajat: known.nilaiDerajat },
+  ];
+  if (Array.isArray(spec.sudutLain)) {
+    for (const s of spec.sudutLain) {
+      if (!s || !SUDUT_QUADRANTS[s.posisi as SudutPosisi] || (s.diGaris !== 1 && s.diGaris !== 2)) continue;
+      const q = SUDUT_QUADRANTS[s.posisi as SudutPosisi];
+      allMarks.push({
+        diGaris: s.diGaris,
+        posisi: s.posisi,
+        label: s.label || "",
+        nilaiDerajat: s.tampilkanNilai ? Math.round(q.value(theta) * 10) / 10 : null,
+      });
+    }
+  }
+  if (allMarks.length > 4) {
+    return { svg: null, error: "sudut_transversal: maksimal 4 sudut ditandai (1 diketahui + 3 lainnya) agar diagram tetap terbaca." };
+  }
+
+  const W = 480;
+  const H = 280;
+  const x0 = 55;
+  const x1 = 425;
+  const y1 = 85;
+  const y2 = 205;
+  const gap = y2 - y1;
+  const shift = gap / Math.tan(thetaRad);
+  const centerX = (x0 + x1) / 2;
+  const px1 = centerX + shift / 2;
+  const px2 = centerX - shift / 2;
+
+  const dirAtas = sudutRayDir("atas", thetaRad);
+  const dirBawah = sudutRayDir("bawah", thetaRad);
+  const extend = 45;
+  const transEnd1 = [px1 + dirAtas[0] * extend, y1 + dirAtas[1] * extend];
+  const transEnd2 = [px2 + dirBawah[0] * extend, y2 + dirBawah[1] * extend];
+
+  const garis1 = `<line x1="${x0}" y1="${y1}" x2="${x1}" y2="${y1}" stroke="${INK}" stroke-width="2.5"/>`;
+  const garis2 = `<line x1="${x0}" y1="${y2}" x2="${x1}" y2="${y2}" stroke="${INK}" stroke-width="2.5"/>`;
+  const transversal = `<line x1="${transEnd1[0].toFixed(1)}" y1="${transEnd1[1].toFixed(1)}" x2="${transEnd2[0].toFixed(1)}" y2="${transEnd2[1].toFixed(1)}" stroke="#4f46e5" stroke-width="2.5"/>`;
+  const label1 = `<text x="${x0}" y="${y1 - 10}" font-size="13" fill="#64748b" font-family="${FONT}">${escXml(spec.labelGaris1 || "p")}</text>`;
+  const label2 = `<text x="${x0}" y="${y2 - 10}" font-size="13" fill="#64748b" font-family="${FONT}">${escXml(spec.labelGaris2 || "q")}</text> <text x="${x0 + 20}" y="${y2 - 10}" font-size="11" fill="#94a3b8" font-family="${FONT}">(${escXml(spec.labelGaris1 || "p")} // ${escXml(spec.labelGaris2 || "q")})</text>`;
+
+  const markColors = ["#d97706", "#059669", "#7c3aed", "#db2777"];
+  const markSvgs: string[] = [];
+  allMarks.forEach((m, idx) => {
+    const vx = m.diGaris === 1 ? px1 : px2;
+    const vy = m.diGaris === 1 ? y1 : y2;
+    const q = SUDUT_QUADRANTS[m.posisi];
+    const dirA = sudutRayDir(q.rays[0], thetaRad);
+    const dirB = sudutRayDir(q.rays[1], thetaRad);
+    const color = markColors[idx % markColors.length];
+    const r = 26;
+    markSvgs.push(`<path d="${sudutArcPath(vx, vy, r, dirA, dirB)}" fill="none" stroke="${color}" stroke-width="2"/>`);
+
+    const midAngle = Math.atan2(dirA[1] + dirB[1], dirA[0] + dirB[0]);
+    const labelR = 46;
+    const lx = vx + labelR * Math.cos(midAngle);
+    const ly = vy + labelR * Math.sin(midAngle) + (Math.sin(midAngle) > 0.3 ? 5 : 0);
+    const text = m.nilaiDerajat !== null ? `${escXml(m.label)} = ${m.nilaiDerajat}°` : escXml(m.label);
+    markSvgs.push(
+      `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-size="13" font-weight="700" text-anchor="middle" fill="${color}" font-family="${FONT}">${text}</text>`
+    );
+  });
+
+  return {
+    svg: wrapSvg(W, H, `${garis1}${garis2}${transversal}${label1}${label2}${markSvgs.join("")}`),
+    error: null,
+  };
+}
+
 export function renderDiagramTemplate(spec: any): DiagramRenderResult {
   if (!spec || typeof spec !== "object") {
     return { svg: null, error: "Spesifikasi diagram kosong atau bukan objek." };
@@ -359,10 +509,12 @@ export function renderDiagramTemplate(spec: any): DiagramRenderResult {
       return renderModelPecahan(spec);
     case "garis_bilangan":
       return renderGarisBilangan(spec);
+    case "sudut_transversal":
+      return renderSudutTransversal(spec);
     default:
       return {
         svg: null,
-        error: `Archetype diagram "${spec.archetype}" tidak dikenali. Gunakan salah satu: diagram_batang, diagram_lingkaran, model_pecahan, garis_bilangan.`,
+        error: `Archetype diagram "${spec.archetype}" tidak dikenali. Gunakan salah satu: diagram_batang, diagram_lingkaran, model_pecahan, garis_bilangan, sudut_transversal.`,
       };
   }
 }
