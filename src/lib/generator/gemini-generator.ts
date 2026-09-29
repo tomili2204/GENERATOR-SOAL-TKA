@@ -1794,7 +1794,10 @@ ${curriculumGuidance}`;
       mapel,
       tipeSumber: "ai",
       authorId: adminId || "usr-admin-001",
-      jumlahSoal: totalDiminta,
+      // jumlahSoal WAJIB angka yang benar-benar tersimpan (validQuestions.length), bukan
+      // totalDiminta -- retry chunk kadang meloloskan lebih/kurang dari target, dan field ini
+      // pernah keliru dibiarkan memakai angka permintaan sehingga beda dari isi paket sungguhan.
+      jumlahSoal: validQuestions.length,
       distribusiBentukSoal: actualDistBentuk,
       distribusiKesulitan: actualDistKesulitan,
       status: packageStatus,
@@ -1900,7 +1903,10 @@ ${curriculumGuidance}`;
   }
 
   // 9. Catat Log Audit & Log Generasi
-  const overallStatus = validQuestions.length === totalDiminta ? "berhasil" : "sebagian";
+  // ">=" (bukan "===") supaya batch yang meloloskan LEBIH banyak dari target (retry chunk
+  // kadang menghasilkan surplus valid) tetap berstatus "berhasil", bukan "sebagian" yang
+  // menyiratkan kekurangan padahal sebenarnya kelebihan.
+  const overallStatus = validQuestions.length >= totalDiminta ? "berhasil" : "sebagian";
   const completedAt = new Date();
 
   await saveGenerationLog({
