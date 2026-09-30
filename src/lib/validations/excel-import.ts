@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { validateLatexDelimiters } from "./latex";
+import { isDriveShareLink } from "@/lib/import/drive-image-fetch";
 
 /**
  * Parser & validator untuk template impor massal soal via Excel (.xlsx).
@@ -78,7 +79,8 @@ export interface ParsedQuestionRow {
   tingkatKesulitan: "rendah" | "sedang" | "tinggi";
   soalText: string;
   pembahasan: string;
-  gambar: { tipe: "url"; url: string; deskripsi_alt: string } | null;
+  bobot: number;
+  gambar: { tipe: "url" | "drive_link"; url: string; deskripsi_alt: string } | null;
   opsi: Array<{ label: string; text: string }> | null;
   kunciJawaban: string[];
   pernyataan: Array<{ no: number; text: string }> | null;
@@ -203,6 +205,17 @@ export function parseAndValidateExcelImport(fileBuffer: Buffer, mapel: string): 
       errors.push(`Kolom "Level Kognitif" tidak valid: "${cellStr(row, "Level Kognitif")}" (harus L1, L2, atau L3)`);
     }
 
+    const bobotRaw = cellStr(row, "Bobot");
+    let bobot = 1;
+    if (bobotRaw !== "") {
+      const bobotNum = Number(bobotRaw);
+      if (!Number.isInteger(bobotNum) || bobotNum < 1) {
+        errors.push(`Kolom "Bobot" tidak valid: "${bobotRaw}" (harus bilangan bulat >= 1, atau dikosongkan untuk nilai default 1).`);
+      } else {
+        bobot = bobotNum;
+      }
+    }
+
     const pembahasan = cellStr(row, "Pembahasan");
     if (pembahasan) {
       const v = validateLatexDelimiters(pembahasan, "Pembahasan");
@@ -292,7 +305,10 @@ export function parseAndValidateExcelImport(fileBuffer: Buffer, mapel: string): 
       tingkatKesulitan,
       soalText,
       pembahasan,
-      gambar: mediaUrl ? { tipe: "url", url: mediaUrl, deskripsi_alt: "" } : null,
+      bobot,
+      gambar: mediaUrl
+        ? { tipe: isDriveShareLink(mediaUrl) ? "drive_link" : "url", url: mediaUrl, deskripsi_alt: "" }
+        : null,
       opsi,
       kunciJawaban,
       pernyataan,

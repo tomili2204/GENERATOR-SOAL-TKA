@@ -17,6 +17,8 @@ import {
   UserCheck,
   Coins,
   Rocket,
+  FileDown,
+  Receipt,
 } from "lucide-react";
 
 export interface RoleConfig {
@@ -220,6 +222,13 @@ export const DASHBOARD_NAV_ITEMS: NavItem[] = [
     roles: ["pembuat_soal"],
     section: "Pembuat Soal",
   },
+  {
+    title: "Unduh Format Soal",
+    href: "/pembuat/unduh-template",
+    icon: FileDown,
+    roles: ["pembuat_soal"],
+    section: "Pembuat Soal",
+  },
   // Menu Validator Soal
   {
     title: "Telaah Per Paket",
@@ -296,6 +305,13 @@ export const DASHBOARD_NAV_ITEMS: NavItem[] = [
     title: "Laporan Validasi & HR",
     href: "/admin/honorarium",
     icon: Wallet,
+    roles: ["admin"],
+    section: "Administrator",
+  },
+  {
+    title: "Biaya & Pengeluaran AI",
+    href: "/admin/biaya-ai",
+    icon: Receipt,
     roles: ["admin"],
     section: "Administrator",
   },

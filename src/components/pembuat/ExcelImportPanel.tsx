@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { FileSpreadsheet, X, UploadCloud, Loader2, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+import { FileSpreadsheet, X, UploadCloud, Loader2, CheckCircle2, AlertTriangle, XCircle, FileDown } from "lucide-react";
 
 interface RowError {
   rowNumber: number;
@@ -19,20 +19,51 @@ interface ImportResult {
 
 interface ExcelImportPanelProps {
   packageId: string;
+  jenjang: string;
+  mapel: string;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function ExcelImportPanel({ packageId, isOpen, onClose, onSuccess }: ExcelImportPanelProps) {
+export function ExcelImportPanel({ packageId, jenjang, mapel, isOpen, onClose, onSuccess }: ExcelImportPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [rowErrors, setRowErrors] = useState<RowError[]>([]);
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
+  const [templateErrorMessage, setTemplateErrorMessage] = useState("");
 
   if (!isOpen) return null;
+
+  const handleDownloadTemplate = async () => {
+    setIsDownloadingTemplate(true);
+    setTemplateErrorMessage("");
+    try {
+      const params = new URLSearchParams({ jenjang, mapel });
+      const res = await fetch(`/api/import-template?${params.toString()}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setTemplateErrorMessage(data.error || "Gagal mengunduh template.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `template-impor-soal-${mapel}-${jenjang}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setTemplateErrorMessage(err.message || "Terjadi kesalahan jaringan saat mengunduh template.");
+    } finally {
+      setIsDownloadingTemplate(false);
+    }
+  };
 
   const reset = () => {
     setFileName("");
@@ -108,12 +139,30 @@ export function ExcelImportPanel({ packageId, isOpen, onClose, onSuccess }: Exce
         <div className="p-6 overflow-y-auto flex-1 space-y-4">
           {!result && (
             <>
-              <div className="p-3.5 rounded-xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-800 leading-relaxed">
-                File harus mengikuti template resmi: sheet <strong>"Soal"</strong> (data butir soal) dan{" "}
-                <strong>"Referensi Kompetensi"</strong> (kamus kode kompetensi). Soal dengan teks baru akan
-                ditambahkan ke slot kosong. Soal dengan teks yang <strong>persis sama</strong> dengan yang sudah ada
-                di paket ini akan <strong>diperbarui</strong> (mis. melengkapi pembahasan) dan otomatis dikirim ulang
-                ke antrean validasi — kecuali soal itu sudah berstatus disetujui (terkunci).
+              <div className="p-3.5 rounded-xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-800 leading-relaxed space-y-2.5">
+                <p>
+                  File harus mengikuti template resmi: sheet <strong>"Soal"</strong> (data butir soal) dan{" "}
+                  <strong>"Referensi Kompetensi"</strong> (kamus kode kompetensi). Soal dengan teks baru akan
+                  ditambahkan ke slot kosong. Soal dengan teks yang <strong>persis sama</strong> dengan yang sudah
+                  ada di paket ini akan <strong>diperbarui</strong> (mis. melengkapi pembahasan) dan otomatis dikirim
+                  ulang ke antrean validasi — kecuali soal itu sudah berstatus disetujui (terkunci).
+                </p>
+                <button
+                  type="button"
+                  onClick={handleDownloadTemplate}
+                  disabled={isDownloadingTemplate}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-indigo-700 bg-white border border-indigo-300 rounded-lg hover:bg-indigo-100 disabled:opacity-50 shadow-xs cursor-pointer"
+                >
+                  {isDownloadingTemplate ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <FileDown className="w-3.5 h-3.5" />
+                  )}
+                  <span>Unduh Template Format Soal ({mapel} {jenjang})</span>
+                </button>
+                {templateErrorMessage && (
+                  <p className="text-rose-700 font-medium">{templateErrorMessage}</p>
+                )}
               </div>
 
               <label className="block border-2 border-dashed border-slate-300 rounded-xl p-8 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/40 transition-colors">

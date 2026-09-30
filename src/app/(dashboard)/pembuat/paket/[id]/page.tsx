@@ -263,6 +263,8 @@ export default function PembuatPaketDetailPage() {
       {/* Modal Impor Massal dari Excel */}
       <ExcelImportPanel
         packageId={packageId}
+        jenjang={packageData.jenjang}
+        mapel={packageData.mapel}
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
         onSuccess={() => loadPackageDetails()}

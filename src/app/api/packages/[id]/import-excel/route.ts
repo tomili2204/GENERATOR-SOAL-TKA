@@ -4,10 +4,30 @@ import { questionPackages, questions, auditLogs } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth/session";
 import { hasAnyRole } from "@/lib/auth/roles";
 import { eq } from "drizzle-orm";
-import { parseAndValidateExcelImport } from "@/lib/validations/excel-import";
+import { parseAndValidateExcelImport, type RowError } from "@/lib/validations/excel-import";
 import { calculatePackageStatus } from "@/lib/validations/package-blueprint";
+import { resolveDriveImage } from "@/lib/import/drive-image-fetch";
+import { uploadSoalImage, StorageNotConfiguredError } from "@/lib/storage/soal-image-storage";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+export const maxDuration = 60;
+
+const DRIVE_IMAGE_CONCURRENCY = 4;
+
+// Menjalankan `fn` atas `items` dengan jumlah pekerjaan paralel dibatasi, agar tidak
+// membombardir Google Drive / penyimpanan dengan puluhan request bersamaan sekaligus.
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < items.length) {
+      const i = nextIndex++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
 
 // POST /api/packages/[id]/import-excel - Impor massal butir soal dari file .xlsx
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -66,6 +86,45 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       );
     }
 
+    // Resolusi gambar dari tautan Google Drive: dijalankan SETELAH seluruh validasi baris
+    // lolos, dan HANYA menulis ke database bila semua gambar Drive berhasil diunduh --
+    // menjaga semantik "semua atau tidak sama sekali" yang sudah ada pada fitur impor ini.
+    const driveRows = parseResult.rows.filter((row) => row.gambar?.tipe === "drive_link");
+    if (driveRows.length > 0) {
+      const driveErrors: RowError[] = [];
+      const resolutions = await mapWithConcurrency(driveRows, DRIVE_IMAGE_CONCURRENCY, async (row) => {
+        try {
+          const result = await resolveDriveImage(row.gambar!.url);
+          if (!result.ok) return { row, error: result.error };
+          const uploaded = await uploadSoalImage(result.buffer, result.contentType);
+          return { row, url: uploaded.url };
+        } catch (err: any) {
+          const message =
+            err instanceof StorageNotConfiguredError
+              ? err.message
+              : `Gagal mengunduh/menyimpan gambar Google Drive: ${err?.message || "kesalahan tak terduga"}.`;
+          return { row, error: message };
+        }
+      });
+      for (const res of resolutions) {
+        if ("error" in res) {
+          driveErrors.push({ rowNumber: res.row.rowNumber, no: res.row.no, errors: [`Kolom "Media Soal": ${res.error}`] });
+        } else {
+          res.row.gambar = { tipe: "url", url: res.url, deskripsi_alt: "" };
+        }
+      }
+      if (driveErrors.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Gagal mengambil ${driveErrors.length} gambar dari Google Drive. Perbaiki lalu unggah ulang (tidak ada soal yang disimpan).`,
+            rowErrors: driveErrors,
+          },
+          { status: 422 }
+        );
+      }
+    }
+
     // Ambil soal yang sudah ada di paket ini: untuk mencocokkan pembaruan & cari slot kosong
     const existingQuestions = await db
       .select({
@@ -114,6 +173,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         kategori_respons: row.kategoriRespons,
         kunci_jawaban: row.kunciJawaban,
         pembahasan: row.pembahasan,
+        bobot: row.bobot,
       };
 
       const existing = existingByText.get(row.soalText.trim());
