@@ -395,7 +395,11 @@ export function QuestionReviewModal({
                   onClick={() => handleAction("direvisi")}
                   className="px-4 py-1.5 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 disabled:opacity-50 rounded-lg shadow-xs"
                 >
-                  {submitting ? "Memproses..." : "Kirim Permintaan Revisi"}
+                  {submitting
+                    ? "Memproses..."
+                    : question.status === "direvisi" || question.status === "perlu_revisi"
+                    ? "Simpan Catatan Revisi"
+                    : "Kirim Permintaan Revisi"}
                 </button>
               </div>
             </div>
@@ -468,7 +472,11 @@ export function QuestionReviewModal({
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-orange-800 bg-orange-50 border border-orange-200 hover:bg-orange-100 rounded-lg transition-colors"
                   >
                     <AlertTriangle className="w-4 h-4 text-orange-600" />
-                    <span>Minta Revisi</span>
+                    <span>
+                      {question.status === "direvisi" || question.status === "perlu_revisi"
+                        ? "Edit Catatan Revisi"
+                        : "Minta Revisi"}
+                    </span>
                   </button>
 
                   <button

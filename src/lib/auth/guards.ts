@@ -74,9 +74,11 @@ export async function assertCanValidateQuestion(questionId: string, user: Sessio
   }
 
   // 4. Pastikan status soal memang layak divalidasi
-  if (question.status !== "menunggu_validasi") {
+  // Diizinkan jika berstatus "menunggu_validasi", "direvisi" / "perlu_revisi" (untuk memperbarui catatan teknis atau keputusan), atau "ditolak"
+  const validatableStatuses = ["menunggu_validasi", "direvisi", "perlu_revisi", "ditolak"];
+  if (!validatableStatuses.includes(question.status)) {
     throw new AuthError(
-      `Soal ${question.code} saat ini berstatus "${question.status}", bukan "menunggu_validasi".`,
+      `Soal ${question.code} saat ini berstatus "${question.status}", bukan "menunggu_validasi" atau dalam proses telaah.`,
       400
     );
   }
