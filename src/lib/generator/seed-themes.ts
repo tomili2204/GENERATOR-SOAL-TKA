@@ -223,6 +223,72 @@ export const INITIAL_THEMES: InitialTheme[] = [
     jenjangCocok: ["SD/MI", "SMP/MTs", "SMA/MA", "SMK/MAK"],
     aktif: true,
   },
+
+  // --- 10 TEMA PERSONAL/KELUARGA/DUNIA ANAK UNTUK SD/MI (2026-09-30) ---
+  // Ditambahkan karena pool sebelumnya hanya punya 1 tema personal ("Keuangan Pribadi &
+  // Tabungan") dari 23 tema yang cocok SD/MI, sementara soal resmi Pusmendik SD banyak
+  // berkonteks personal/keluarga/dunia anak. Ditulis sebagai benih inspirasi terbuka (nama +
+  // arah umum), tanpa tokoh/angka/alur konkret -- AI tetap bebas menentukan isi ceritanya.
+  {
+    namaTema: "Jajan dan Uang Saku",
+    subKonteks: ["uang jajan harian", "menabung dari sisa uang jajan", "berbagi jajan dengan teman"],
+    jenjangCocok: ["SD/MI"],
+    aktif: true,
+  },
+  {
+    namaTema: "Hobi dan Permainan Anak",
+    subKonteks: ["permainan bersama teman", "koleksi mainan atau kartu", "waktu bermain sehari-hari"],
+    jenjangCocok: ["SD/MI"],
+    aktif: true,
+  },
+  {
+    namaTema: "Rumah dan Keluarga",
+    subKonteks: ["kegiatan bersama anggota keluarga", "pembagian tugas di rumah", "kebiasaan sehari-hari di rumah"],
+    jenjangCocok: ["SD/MI"],
+    aktif: true,
+  },
+  {
+    namaTema: "Aktivitas Fisik dan Bermain di Luar",
+    subKonteks: ["bermain di halaman atau taman", "kegiatan fisik sepulang sekolah", "permainan tradisional anak"],
+    jenjangCocok: ["SD/MI"],
+    aktif: true,
+  },
+  {
+    namaTema: "Hewan Peliharaan dan Kebun Kecil di Rumah",
+    subKonteks: ["merawat hewan peliharaan", "kebun kecil atau pot tanaman di rumah", "memberi makan hewan peliharaan"],
+    jenjangCocok: ["SD/MI"],
+    aktif: true,
+  },
+  {
+    namaTema: "Perjalanan dan Liburan Keluarga",
+    subKonteks: ["persiapan liburan keluarga", "perjalanan mengunjungi kerabat", "kegiatan selama liburan"],
+    jenjangCocok: ["SD/MI"],
+    aktif: true,
+  },
+  {
+    namaTema: "Perayaan dan Acara Keluarga",
+    subKonteks: ["ulang tahun anggota keluarga", "acara kumpul keluarga", "persiapan perayaan di rumah"],
+    jenjangCocok: ["SD/MI"],
+    aktif: true,
+  },
+  {
+    namaTema: "Pengalaman Sehari-hari sebagai Murid",
+    subKonteks: ["kegiatan belajar sehari-hari", "perlengkapan sekolah pribadi", "pengalaman di dalam kelas"],
+    jenjangCocok: ["SD/MI"],
+    aktif: true,
+  },
+  {
+    namaTema: "Koleksi dan Barang Pribadi",
+    subKonteks: ["koleksi barang kesukaan", "menyusun atau merapikan barang pribadi", "barang kesayangan anak"],
+    jenjangCocok: ["SD/MI"],
+    aktif: true,
+  },
+  {
+    namaTema: "Memasak dan Membuat Kue di Rumah",
+    subKonteks: ["membantu memasak di dapur", "membuat kue bersama keluarga", "takaran bahan masakan rumahan"],
+    jenjangCocok: ["SD/MI"],
+    aktif: true,
+  },
 ];
 
 export async function ensureThemesSeeded() {

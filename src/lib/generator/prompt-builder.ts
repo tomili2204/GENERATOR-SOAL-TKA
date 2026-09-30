@@ -26,11 +26,25 @@ const GAYA_SOAL = `GAYA SOAL TKA RESMI — pedoman utama:
 6. Istilah yang belum umum bagi siswa jenjang ini dijelaskan singkat saat pertama muncul. Singkatan lembaga ditulis kepanjangannya. Makhluk hidup disebut dengan nama umum bahasa Indonesia, bukan nama ilmiah.
 7. Soal grup: 2–3 butir berurutan memakai satu stimulus dan benar-benar membutuhkan informasi dari stimulus itu.`;
 
-function matematikaRules(): string {
+function matematikaRules(jenjang: string): string {
+  const sdKeseharianAnak = jenjang.includes("SD")
+    ? `\n- Untuk jenjang ini, konteks keseharian pribadi anak (rumah, keluarga, sekolah sebagai murid, jajan, hobi, permainan) sama sahnya dengan konteks komunitas atau usaha orang dewasa. Silakan pilih skenario yang paling wajar dan menarik untuk tema yang diberikan, termasuk bila hasilnya di luar kebiasaan biasanya.`
+    : "";
+
+  // Izin (bukan kewajiban) menyajikan soal tanpa tokoh/cerita untuk sub-elemen yang bentuk
+  // paling jernihnya memang langsung matematis -- BSKAP No. 47/2025 mengukur baik "konteks
+  // matematika" maupun "konteks keseharian", tapi GAYA_SOAL di atas tidak punya pengecualian
+  // untuk itu sehingga selama ini semua soal terpaksa bernarasi (dikonfirmasi lewat audit: 3,5%
+  // soal SMP dan 0% soal SD berkonteks matematika murni, jauh dari pola resmi Pusmendik ~20%).
+  const cakupanBebasNarasi = jenjang.includes("SD")
+    ? "sifat bangun datar, pecahan senilai, dan operasi hitung campuran"
+    : "bentuk aljabar dan sifat operasi, faktorisasi/faktor persekutuan/eksponen, persamaan atau SPL dengan solusi yang sudah diketahui, relasi dan fungsi, pola bilangan/barisan, kekongruenan dan kesebangunan, transformasi geometri, atau sifat bangun";
+  const izinTanpaNarasi = `\n- Untuk sub-elemen ${cakupanBebasNarasi}, BOLEH menyajikan soal langsung berupa ekspresi/persamaan/pola/bangun tanpa tokoh atau cerita, bila itu bentuk paling jernih untuk menguji kompetensinya -- bukan kewajiban, dan jangan diterapkan pada sub-elemen yang alaminya kontekstual (perbandingan, data, peluang). Soal semacam ini tetap wajib menuntut penalaran (bukan sekadar satu langkah hitungan) dan tetap punya pengecoh berbasis miskonsepsi nyata. Saat memakai izin ini, isi field "tema_konteks" dengan tepat teks "Konteks Matematika".`;
+
   return `KETENTUAN MATEMATIKA:
 - Level kognitif: (1) Pengetahuan dan Pemahaman — menghitung, membaca data, mengenali konsep; (2) Aplikasi — memodelkan situasi ke kalimat matematika dan menyelesaikannya; (3) Penalaran — menganalisis, mengevaluasi strategi atau pernyataan, menyimpulkan, mengestimasi.
 - Kompetensi tiap butir mengikuti RENCANA CAKUPAN KOMPETENSI pada instruksi pengguna.
-- Stimulus data boleh berupa tabel Markdown (| Kolom | Kolom |) atau diagram.`;
+- Stimulus data boleh berupa tabel Markdown (| Kolom | Kolom |) atau diagram.${sdKeseharianAnak}${izinTanpaNarasi}`;
 }
 
 function kalimatRules(jenjang: string): string {
@@ -126,7 +140,7 @@ export function buildSystemPrompt(jenjang: string, mapel: string): string {
     BENTUK_SOAL,
     GAYA_SOAL,
     formatExemplarBlock(jenjang, mapel),
-    isMat ? matematikaRules() : "",
+    isMat ? matematikaRules(jenjang) : "",
     isBahasa ? bahasaRules(jenjang) : "",
     VISUAL_RULES,
     RUMUS_DAN_PEMBAHASAN,
