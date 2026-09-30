@@ -707,40 +707,28 @@ async function saveGenerationLog(values: typeof generationLogs.$inferInsert) {
     .onConflictDoUpdate({ target: generationLogs.id, set: values });
 }
 
+/** Dipakai generateBatchQuestions (jaring pengaman terluar) untuk tahu progres inti sejauh apa
+ * saat terjadi kegagalan tak tertangani -- lihat komentar di pemanggilnya. */
+interface GenLogContext {
+  packageId: string | null;
+  packageCode: string | null;
+}
+
 /**
- * Core Engine Pembuatan Soal Otomatis Berbasis Google Gemini API
+ * Core Engine Pembuatan Soal Otomatis Berbasis Google Gemini API. Dipanggil lewat wrapper
+ * generateBatchQuestions di bawah -- jangan panggil langsung dari luar file ini.
  */
-export async function generateBatchQuestions(options: GenerateOptions): Promise<GenerationResult> {
+async function generateBatchQuestionsCore(
+  options: GenerateOptions,
+  logId: string,
+  startedAt: Date,
+  ctx: GenLogContext
+): Promise<GenerationResult> {
   await ensureTablesCreated();
-  const startedAt = new Date();
-  const logId = `gen-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
   const { mapel, configId, adminId, triggeredBy, forceMock } = options;
   const jenjang = normalizeJenjang(options.jenjang);
   const storedConfig = await getStoredAiConfig();
-
-  // Log "berjalan" ditulis di awal dan ditimpa di setiap jalur keluar. Jika fungsi serverless
-  // terputus karena batas durasi, log ini tetap tertinggal sebagai jejak — sebelumnya proses
-  // yang terputus tidak meninggalkan catatan apa pun.
-  await saveGenerationLog({
-    id: logId,
-    configId: configId || null,
-    jenjang,
-    mapel,
-    packageId: null,
-    packageCode: null,
-    status: "berjalan",
-    totalDiminta: options.totalSoal && options.totalSoal > 0 ? options.totalSoal : 30,
-    totalDiterima: 0,
-    totalLolos: 0,
-    totalGagal: 0,
-    detailPemeriksaan: [],
-    errorMessage: null,
-    triggeredBy,
-    adminId: adminId || null,
-    startedAt,
-    completedAt: null,
-  });
 
   const apiKey = options.apiKey?.trim() || storedConfig.apiKey;
   const modelName = options.modelName?.trim() || storedConfig.modelName;
@@ -1696,6 +1684,10 @@ ${curriculumGuidance}`;
     packageNama = generated.nama;
     packageId = `pkg-ai-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
   }
+  // Catat sejak di sini (sebelum langkah Nano Banana/simpan yang bisa gagal) agar wrapper
+  // generateBatchQuestions tahu paket mana yang sedang diproses bila terjadi crash tak tertangani.
+  ctx.packageId = packageId;
+  ctx.packageCode = packageCode;
 
   // Hitung distribusi bentuk & kesulitan AKTUAL dari soal yang benar-benar tersimpan. Untuk mode
   // sambung/ganti slot, distribusi paket dihitung ulang dari database setelah soal disimpan.
@@ -1963,6 +1955,98 @@ ${curriculumGuidance}`;
     nanoBananaConverted,
     nanoBananaFallback,
   };
+}
+
+/**
+ * Core Engine Pembuatan Soal Otomatis Berbasis Google Gemini API. Jaring pengaman terluar:
+ * apa pun yang terjadi di dalam generateBatchQuestionsCore (termasuk error tak tertangani di
+ * luar semua try/catch internalnya, mis. antara penyimpanan soal dan penulisan log akhir),
+ * fungsi ini MEMASTIKAN log generate tidak pernah tertinggal selamanya berstatus "berjalan".
+ *
+ * Ditemukan nyata di produksi: satu proses cron berhasil menyimpan paket + 30 soal secara utuh,
+ * tapi log generate-nya macet di "berjalan" tanpa batas waktu karena ada error tak tertangani
+ * SETELAH penyimpanan soal namun SEBELUM penulisan log akhir -- paket itu jadi tidak pernah
+ * muncul di riwayat generate sama sekali walau isinya valid.
+ */
+export async function generateBatchQuestions(options: GenerateOptions): Promise<GenerationResult> {
+  const startedAt = new Date();
+  const logId = `gen-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const jenjang = normalizeJenjang(options.jenjang);
+  const totalDiminta = options.totalSoal && options.totalSoal > 0 ? options.totalSoal : 30;
+  const ctx: GenLogContext = { packageId: null, packageCode: null };
+
+  // Log "berjalan" ditulis di awal dan ditimpa di setiap jalur keluar (termasuk lewat catch di
+  // bawah). Jika fungsi serverless terputus karena batas durasi sebelum sempat menulis apa pun
+  // lagi, log ini tetap tertinggal sebagai jejak -- lebih baik daripada tanpa jejak sama sekali.
+  await saveGenerationLog({
+    id: logId,
+    configId: options.configId || null,
+    jenjang,
+    mapel: options.mapel,
+    packageId: null,
+    packageCode: null,
+    status: "berjalan",
+    totalDiminta,
+    totalDiterima: 0,
+    totalLolos: 0,
+    totalGagal: 0,
+    detailPemeriksaan: [],
+    errorMessage: null,
+    triggeredBy: options.triggeredBy,
+    adminId: options.adminId || null,
+    startedAt,
+    completedAt: null,
+  });
+
+  try {
+    return await generateBatchQuestionsCore(options, logId, startedAt, ctx);
+  } catch (err: any) {
+    const completedAt = new Date();
+    const message = err?.message || String(err);
+    console.error("[generateBatchQuestions] Kegagalan tak tertangani:", err);
+    // Bila paket sudah sempat dibuat sebelum crash, tandai "sebagian" (bukan "gagal") dan
+    // sertakan tautan paketnya -- isinya mungkin sudah lengkap & valid, admin perlu memeriksa
+    // langsung, bukan menganggapnya gagal total dan hilang begitu saja seperti kasus nyata di atas.
+    const status = ctx.packageId ? "sebagian" : "gagal";
+    const errorMessage = ctx.packageId
+      ? `Proses terputus setelah paket ${ctx.packageCode} mulai disimpan (error tak terduga: ${message}). Periksa langsung kelengkapan paket ini.`
+      : `Kegagalan tak terduga sebelum paket dibuat: ${message}`;
+
+    await saveGenerationLog({
+      id: logId,
+      configId: options.configId || null,
+      jenjang,
+      mapel: options.mapel,
+      packageId: ctx.packageId,
+      packageCode: ctx.packageCode,
+      status,
+      totalDiminta,
+      totalDiterima: 0,
+      totalLolos: 0,
+      totalGagal: 0,
+      detailPemeriksaan: [],
+      errorMessage,
+      triggeredBy: options.triggeredBy,
+      adminId: options.adminId || null,
+      startedAt,
+      completedAt,
+    }).catch((logErr) => console.error("[generateBatchQuestions] Gagal menulis log kegagalan akhir:", logErr));
+
+    return {
+      success: false,
+      logId,
+      status,
+      packageId: ctx.packageId || undefined,
+      packageCode: ctx.packageCode || undefined,
+      totalDiminta,
+      totalDiterima: 0,
+      totalLolos: 0,
+      totalGagal: 0,
+      detailPemeriksaan: [],
+      errorMessage,
+      durationMs: completedAt.getTime() - startedAt.getTime(),
+    };
+  }
 }
 
 /**
