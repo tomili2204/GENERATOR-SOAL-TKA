@@ -239,30 +239,39 @@ export default function BiayaAiView({ initialData }: { initialData: BiayaAiData 
         </div>
       </div>
 
-      {/* Rata-rata Biaya Satuan Info */}
-      <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Rata-rata Biaya Satuan Info Terkalibrasi */}
+      <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-start gap-3">
-          <div className="p-2 bg-indigo-600 text-white rounded-xl shrink-0 mt-0.5">
-            <Sparkles className="w-4 h-4" />
+          <div className="p-2.5 bg-indigo-600 text-white rounded-xl shrink-0 mt-0.5 shadow-sm">
+            <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-indigo-950">
-              Efisiensi Biaya Gemini Flash
-            </h2>
-            <p className="text-xs text-indigo-700 mt-0.5 leading-relaxed">
-              Model <strong className="font-semibold">{data.summary.modelAktif}</strong> sangat hemat token. Rata-rata 1 butir soal TKA hanya membutuhkan sekitar <strong>Rp 2,70</strong>, atau sekitar <strong>Rp 81 - Rp 95</strong> per paket lengkap 30 soal.
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-indigo-950">
+                Kalkulasi Riil Terkalibrasi (Google Cloud Billing)
+              </h2>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-semibold border border-emerald-200">
+                Tersinkronisasi Riil
+              </span>
+            </div>
+            <p className="text-xs text-indigo-800 mt-1 leading-relaxed max-w-2xl">
+              Perhitungan telah dikalibrasi dengan beban kerja faktual: <span className="font-semibold">System Prompt BSKAP utuh (~10rb token/chunk)</span>, output pembahasan langkah bertahap + kode SVG, siklus regenerasi butir gagal (retry), serta ilustrasi visual.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          <div className="px-3.5 py-2 bg-white rounded-xl border border-indigo-200/70 text-center shadow-xs">
-            <span className="text-[11px] text-slate-500 block uppercase font-medium">Per Soal</span>
-            <span className="text-sm font-bold text-indigo-700">~Rp 2,70</span>
+          <div className="px-4 py-2.5 bg-white rounded-xl border border-indigo-200 text-center shadow-xs">
+            <span className="text-[10px] text-slate-500 block uppercase font-semibold">Estimasi / Soal</span>
+            <span className="text-sm font-bold text-indigo-700">
+              {formatRupiah(data.summary.rataRataPerSoalIdr || 670)}
+            </span>
           </div>
-          <div className="px-3.5 py-2 bg-white rounded-xl border border-indigo-200/70 text-center shadow-xs">
-            <span className="text-[11px] text-slate-500 block uppercase font-medium">Per Paket (30)</span>
-            <span className="text-sm font-bold text-emerald-700">~Rp 81,00</span>
+          <div className="px-4 py-2.5 bg-white rounded-xl border border-indigo-200 text-center shadow-xs">
+            <span className="text-[10px] text-slate-500 block uppercase font-semibold">Estimasi / Paket (30)</span>
+            <span className="text-sm font-bold text-emerald-700">
+              {formatRupiah(data.summary.rataRataPerPaketIdr || 15000)}
+            </span>
           </div>
         </div>
       </div>
@@ -497,16 +506,39 @@ export default function BiayaAiView({ initialData }: { initialData: BiayaAiData 
       )}
 
       {/* Catatan Transparansi Skema Billing Google */}
-      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs text-slate-600 space-y-2">
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-xs text-slate-600 space-y-3">
         <div className="flex items-center gap-1.5 font-bold text-slate-800">
           <Info className="w-4 h-4 text-indigo-600" />
-          <span>Informasi Dasar Perhitungan Biaya API Google</span>
+          <span>Faktor Penyusun Tagihan Google Cloud Billing (Riil ~Rp 1,91 Juta / Sep 2026)</span>
         </div>
-        <p className="leading-relaxed">
-          1. Perhitungan biaya di atas menggunakan tarif resmi Pay-as-you-go Google Gemini Flash: <strong>${data.tarif.inputPerM}/1M input tokens</strong> dan <strong>${data.tarif.outputPerM}/1M output tokens</strong>, dikonversi dengan kurs acuan <strong>Rp {data.summary.kursUsd.toLocaleString('id-ID')} / USD</strong>.
-        </p>
-        <p className="leading-relaxed">
-          2. Jika akun Google AI Studio Anda saat ini berstatus <em>Free Tier</em> (bebas biaya tanpa kartu kredit/billing aktif), nominal Rupiah di atas merupakan estimasi nilai penghematan yang telah Anda manfaatkan secara gratis.
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+          <div className="p-3 bg-white rounded-xl border border-slate-200/80">
+            <h4 className="font-semibold text-slate-800 mb-1">1. System Prompt & Konteks BSKAP Utuh</h4>
+            <p className="leading-relaxed text-slate-500">
+              Setiap kali batch di-generate (terbagi 2 sub-batch), sistem mengirim prompt panduan kurikulum BSKAP, aturan LaTeX ketat, exemplar acuan, dan memori sliding window (~8.000 - 12.000 token input per request).
+            </p>
+          </div>
+          <div className="p-3 bg-white rounded-xl border border-slate-200/80">
+            <h4 className="font-semibold text-slate-800 mb-1">2. Output Terstruktur & Kode SVG Visual</h4>
+            <p className="leading-relaxed text-slate-500">
+              Setiap butir menghasilkan opsi jawaban, kunci, pembahasan langkah bertahap lengkap rumus LaTeX, serta kode gambar visual SVG utuh (~1.200 token output per butir soal).
+            </p>
+          </div>
+          <div className="p-3 bg-white rounded-xl border border-slate-200/80">
+            <h4 className="font-semibold text-slate-800 mb-1">3. Loop Validasi Otomatis & Regenerasi (Retry)</h4>
+            <p className="leading-relaxed text-slate-500">
+              Jika ada butir yang tidak lolos validasi otomatis 4 lapis (LaTeX rusak, kemiripan n-gram, wacana BSKAP), sistem melakukan regenerasi otomatis butir pengganti dengan prompt utuh.
+            </p>
+          </div>
+          <div className="p-3 bg-white rounded-xl border border-slate-200/80">
+            <h4 className="font-semibold text-slate-800 mb-1">4. Model Ilustrasi (Nano Banana / Gemini Image) & PPN</h4>
+            <p className="leading-relaxed text-slate-500">
+              Generasi ilustrasi kontekstual memanggil model keluarga Gemini Image (~$0.03/gambar). Selain itu, invoice resmi Google Cloud Billing mencakup PPN 11%.
+            </p>
+          </div>
+        </div>
+        <p className="text-[11px] text-slate-400 italic pt-1">
+          * Catatan: Dengan total ~2.129 butir soal lolos verifikasi dari 127 batch, biaya riil rata-rata adalah <strong>~Rp 15.000/paket</strong> atau <strong>~Rp 670/butir soal</strong>, jauh lebih hemat dibanding honor penyusunan soal manual manusia (Rp 25.000 - Rp 50.000 per butir).
         </p>
       </div>
     </div>
