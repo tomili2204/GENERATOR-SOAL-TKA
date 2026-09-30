@@ -256,6 +256,53 @@ async function runQualityTests() {
   });
   assert(!sudutExtreme.svg && Boolean(sudutExtreme.error), "sudut_transversal menolak sudut transversal yang terlalu landai/ekstrem untuk digambar terbaca");
 
+  // ------------------------------------------------------------------
+  // 8. Diagram pola_baris: titik tidak boleh menabrak label
+  // ------------------------------------------------------------------
+  console.log("\n--- 8. Diagram pola_baris: Anti-Tabrak Label ---");
+
+  // Kasus nyata yang dilaporkan pengguna: A24-SMP-MAT-20, barisan pot bibit 6/10/14.
+  const polaCase = renderDiagramTemplate({
+    archetype: "pola_baris",
+    judul: "Formasi Tiga Baris Pertama Pot Bibit",
+    baris: [
+      { label: "Baris 1 (6 pot):", jumlah: 6 },
+      { label: "Baris 2 (10 pot):", jumlah: 10 },
+      { label: "Baris 3 (14 pot):", jumlah: 14 },
+    ],
+    catatan: "Pola berlanjut dengan beda tetap tiap baris (+4 pot)",
+  });
+  assert(Boolean(polaCase.svg) && !polaCase.error, "pola_baris kasus nyata berhasil dirender");
+
+  // Verifikasi geometris: titik pertama tiap baris tidak boleh berada di rentang x label mana pun.
+  const svg = polaCase.svg || "";
+  const labelXs = [...svg.matchAll(/<text x="20" y="[\d.]+"[^>]*>([^<]+)<\/text>/g)].map((m) => m[1]);
+  const CHAR_W = 13 * 0.55;
+  const maxLabelEnd = 20 + Math.max(...labelXs.map((l) => l.length * CHAR_W));
+  const circleXs = [...svg.matchAll(/<circle cx="([\d.]+)"/g)].map((m) => Number(m[1]));
+  const minCircleX = Math.min(...circleXs);
+  assert(
+    minCircleX - 8 > maxLabelEnd,
+    `Titik paling kiri (x=${minCircleX.toFixed(1)}) tidak menabrak label terpanjang (berakhir ~x=${maxLabelEnd.toFixed(1)})`
+  );
+  assert(circleXs.length === 6 + 10 + 14, `Total titik sesuai jumlah baris (found ${circleXs.length}, expected 30)`);
+
+  // Baris yang terlalu panjang untuk satu baris kanvas harus melipat ke baris kedua, bukan
+  // meluber keluar viewBox.
+  const wrapCase = renderDiagramTemplate({
+    archetype: "pola_baris",
+    baris: [{ label: "Baris besar:", jumlah: 40 }],
+  });
+  const wrapCircleXs = [...(wrapCase.svg || "").matchAll(/<circle cx="([\d.]+)"/g)].map((m) => Number(m[1]));
+  assert(
+    Boolean(wrapCase.svg) && Math.max(...wrapCircleXs) <= 480,
+    "Baris dengan banyak titik melipat ke baris berikutnya, tidak meluber keluar kanvas"
+  );
+
+  // Validasi: baris kosong / jumlah tidak valid ditolak.
+  const polaInvalid = renderDiagramTemplate({ archetype: "pola_baris", baris: [] });
+  assert(!polaInvalid.svg && Boolean(polaInvalid.error), "pola_baris menolak array baris kosong");
+
   // Summary
   console.log("\n==================================================================");
   console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);

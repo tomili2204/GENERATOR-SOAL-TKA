@@ -47,12 +47,20 @@ export interface SudutTransversalSpec {
   sudutLain?: Array<{ diGaris: 1 | 2; posisi: SudutPosisi; label: string; tampilkanNilai?: boolean }>;
 }
 
+export interface PolaBarisSpec {
+  archetype: "pola_baris";
+  judul?: string;
+  baris: Array<{ label: string; jumlah: number }>;
+  catatan?: string;
+}
+
 export type DiagramSpec =
   | DiagramBatangSpec
   | DiagramLingkaranSpec
   | ModelPecahanSpec
   | GarisBilanganSpec
-  | SudutTransversalSpec;
+  | SudutTransversalSpec
+  | PolaBarisSpec;
 
 export interface DiagramRenderResult {
   svg: string | null;
@@ -496,6 +504,74 @@ function renderSudutTransversal(spec: any): DiagramRenderResult {
   };
 }
 
+function renderPolaBaris(spec: any): DiagramRenderResult {
+  const baris = spec.baris;
+  if (!Array.isArray(baris) || baris.length === 0) {
+    return { svg: null, error: "pola_baris wajib memiliki array 'baris' berisi minimal 1 baris." };
+  }
+  if (baris.length > 8) {
+    return { svg: null, error: "pola_baris: maksimal 8 baris agar diagram tetap terbaca." };
+  }
+  for (const b of baris) {
+    if (!b || typeof b.jumlah !== "number" || b.jumlah < 1 || b.jumlah > 60 || !b.label) {
+      return { svg: null, error: "pola_baris: setiap baris wajib memiliki 'label' dan 'jumlah' (1-60)." };
+    }
+  }
+
+  const W = 480;
+  const rightMargin = 20;
+  const dotR = 8;
+  const step = 22;
+  const lineHeight = 26;
+
+  // Perkiraan lebar label (pola yang sama dengan perbaikan diagram_batang sebelumnya) --
+  // AKAR masalah nyata yang ditemukan: AI menulis SVG bebas menaruh titik pada x tetap tanpa
+  // memperhitungkan lebar teks label, sehingga baris dengan banyak titik menjorok menabrak
+  // labelnya sendiri. Di sini titik SELALU mulai setelah label paling panjang, dihitung dari kode.
+  const CHAR_WIDTH_ESTIMATE = 13 * 0.55;
+  const maxLabelWidth = Math.max(...baris.map((b: any) => String(b.label).length * CHAR_WIDTH_ESTIMATE));
+  const startX = Math.min(220, 40 + maxLabelWidth + 20);
+  const maxPerLine = Math.max(1, Math.floor((W - startX - rightMargin) / step));
+
+  const top = spec.judul ? 55 : 30;
+  const rowBlocks: string[] = [];
+  let cursorY = top;
+  const rowGap = 18;
+
+  baris.forEach((b: any) => {
+    const jumlah = Math.round(b.jumlah);
+    const linesNeeded = Math.ceil(jumlah / maxPerLine);
+    const rowHeight = Math.max(lineHeight, linesNeeded * lineHeight);
+    const labelY = cursorY + rowHeight / 2 + 4;
+    rowBlocks.push(
+      `<text x="20" y="${labelY.toFixed(1)}" font-size="13" font-weight="700" fill="#475569" font-family="${FONT}">${escXml(b.label)}</text>`
+    );
+    let remaining = jumlah;
+    for (let line = 0; line < linesNeeded; line++) {
+      const onThisLine = Math.min(maxPerLine, remaining);
+      remaining -= onThisLine;
+      const cy = cursorY + lineHeight / 2 + line * lineHeight;
+      for (let i = 0; i < onThisLine; i++) {
+        const cx = startX + i * step;
+        rowBlocks.push(`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${dotR}" fill="#059669"/>`);
+      }
+    }
+    cursorY += rowHeight + rowGap;
+  });
+
+  const bottom = spec.catatan ? cursorY + 20 : cursorY;
+  const H = Math.round(bottom);
+
+  const judulSvg = spec.judul
+    ? `<text x="${W / 2}" y="28" text-anchor="middle" font-size="15" font-weight="700" fill="${INK}" font-family="${FONT}">${escXml(spec.judul)}</text>`
+    : "";
+  const catatanSvg = spec.catatan
+    ? `<text x="${W / 2}" y="${(H - 8).toFixed(1)}" text-anchor="middle" font-size="12" fill="#64748b" font-family="${FONT}">${escXml(spec.catatan)}</text>`
+    : "";
+
+  return { svg: wrapSvg(W, H, `${judulSvg}${rowBlocks.join("")}${catatanSvg}`), error: null };
+}
+
 export function renderDiagramTemplate(spec: any): DiagramRenderResult {
   if (!spec || typeof spec !== "object") {
     return { svg: null, error: "Spesifikasi diagram kosong atau bukan objek." };
@@ -511,10 +587,12 @@ export function renderDiagramTemplate(spec: any): DiagramRenderResult {
       return renderGarisBilangan(spec);
     case "sudut_transversal":
       return renderSudutTransversal(spec);
+    case "pola_baris":
+      return renderPolaBaris(spec);
     default:
       return {
         svg: null,
-        error: `Archetype diagram "${spec.archetype}" tidak dikenali. Gunakan salah satu: diagram_batang, diagram_lingkaran, model_pecahan, garis_bilangan, sudut_transversal.`,
+        error: `Archetype diagram "${spec.archetype}" tidak dikenali. Gunakan salah satu: diagram_batang, diagram_lingkaran, model_pecahan, garis_bilangan, sudut_transversal, pola_baris.`,
       };
   }
 }
