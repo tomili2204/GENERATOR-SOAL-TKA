@@ -14,6 +14,7 @@ const ROLE = `Anda adalah pengembang soal Tes Kemampuan Akademik (TKA) profesion
 const BENTUK_SOAL = `BENTUK SOAL — hanya tiga ini:
 - PG: pilihan ganda, tepat satu jawaban benar dari 4 opsi.
 - PGK_MCMA: pilihan ganda kompleks, 1 sampai 3 opsi benar dari 4 opsi (tidak pernah semua opsi benar); variasikan banyaknya opsi benar antar-butir.
+  PENTING PGK_MCMA: Rencanakan dan hitung angka pengecoh (opsi salah) SEBELUM menulis array "opsi". Pastikan minimal 1 opsi salah secara matematis sebelum menulis teks opsi, agar teks opsi dan kunci jawaban sinkron sejak awal.
 - PGK_KATEGORI: beberapa pernyataan yang masing-masing direspons dengan satu kategori. Pilih pasangan kategori yang cocok dengan pertanyaannya, misalnya Benar/Salah, Sesuai/Tidak Sesuai, Setuju/Tidak Setuju, Fakta/Opini, Mendukung/Tidak Mendukung.
 Distribusikan ketiga bentuk dalam satu batch. Opsi dan pernyataan yang salah harus berupa pengecoh masuk akal yang mencerminkan kekeliruan nyata siswa.`;
 
@@ -108,7 +109,8 @@ const RUMUS_DAN_PEMBAHASAN = `PENULISAN RUMUS DAN PEMBAHASAN:
   Contoh salah: $Total $= 140 + 180 = 320$ kg$
 - Perhitungan panjang boleh ditulis pada baris tersendiri sebagai $$...$$ tanpa teks lain di baris itu.
 - Di dalam JSON tulis backslash LaTeX ganda: \\\\frac{3}{4}, \\\\times, \\\\sqrt{2}. Bilangan desimal ditulis dengan koma (2,5).
-- Pembahasan ditulis per langkah, satu langkah per baris (di dalam JSON dipisah \\n), dan diakhiri kesimpulan yang menyebut kunci jawaban. Tulis seperti guru menulis kunci pembahasan.`;
+- Pembahasan ditulis per langkah, satu langkah per baris (di dalam JSON dipisah \\n), dan diakhiri kesimpulan yang menyebut kunci jawaban. Tulis seperti guru menulis kunci pembahasan.
+- DILARANG KERAS menyertakan proses berpikir/monolog internal AI atau evaluasi instruksi prompt (seperti "karena aturan PGK tidak boleh semua benar", "mari kita ubah opsi", "agar opsi D bernilai salah", "sebagai AI", dsb) ke dalam "pembahasan". Pembahasan HANYA berisi penjelasan konsep, penjabaran langkah hitungan untuk siswa, dan simpulan jawaban.`;
 
 const FORMAT_KELUARAN = `FORMAT KELUARAN — WAJIB, TIDAK BOLEH DILANGGAR:
 Kembalikan HANYA array JSON valid, tanpa teks lain di luar JSON dan tanpa markdown code fence.

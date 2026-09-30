@@ -505,7 +505,7 @@ ATURAN WAJIB:
 1. Perbaiki HANYA sesuai catatan validator yang diberikan. Jangan mengubah bentuk soal, jenis soal, atau taksonomi elemen/kompetensi kecuali validator secara eksplisit memintanya.
 2. Jika catatan meminta redaksi ulang pertanyaan, opsi, atau pembahasan, tulis ulang secara utuh dan konsisten — jangan setengah-setengah atau menyisakan bagian lama yang kontradiktif dengan bagian baru.
 3. Jika catatan menyebutkan hasil perhitungan tidak bulat/tidak rapi, PILIH SALAH SATU: sesuaikan angka pada soal, ATAU ubah redaksi pertanyaan (misalnya menjadi "tambahan/kekurangan minimal") agar tetap valid secara matematis dan kunci jawabannya benar-benar cocok dengan salah satu opsi yang ada (jangan menghasilkan kunci yang tidak ada di daftar opsi).
-4. Field "pembahasan" WAJIB diuraikan bertingkat ke bawah per baris memakai karakter newline (\\n) untuk tiap langkah (contoh: "Diketahui: ...\\nLangkah 1: ...\\nLangkah 2: ...\\nSimpulan: ..."), jelas dan langsung ke inti. DILARANG memakai gaya bahasa yang terasa seperti keluaran AI generik (hindari frasa seperti "Tentu, berikut adalah...", "Sebagai AI...", "Baik, saya akan...", dsb) — tulis sebagaimana pendidik manusia menulis kunci pembahasan.
+4. Field "pembahasan" WAJIB diuraikan bertingkat ke bawah per baris memakai karakter newline (\\n) untuk tiap langkah (contoh: "Diketahui: ...\\nLangkah 1: ...\\nLangkah 2: ...\\nSimpulan: ..."), jelas dan langsung ke inti. DILARANG memakai gaya bahasa yang terasa seperti keluaran AI generik (hindari frasa seperti "Tentu, berikut adalah...", "Sebagai AI...", "Baik, saya akan...", dsb) serta DILARANG KERAS menyertakan proses berpikir/monolog internal (seperti "mari kita ubah opsi agar bernilai salah", "karena aturan PGK", dsb) — tulis murni sebagaimana pendidik manusia menulis kunci pembahasan untuk siswa.
 5. Notasi matematika memakai LaTeX; di dalam JSON, escape backslash ganda (\\\\frac, \\\\times, \\\\sqrt, dst). Satu persamaan utuh berada di dalam SATU pasangan $...$, sedangkan kata penjelas dan satuan ditulis di luar tanda $ (contoh benar: Total = $140 + 180 = 320$ kg; contoh salah: $Total $= 140 + 180 = 320$ kg$). Perhitungan panjang boleh ditulis pada baris sendiri sebagai $$...$$.
 6. Field "gambar": jika catatan validator meminta ganti soal/tema total, atau jika soal baru tidak lagi berhubungan dengan gambar lama, WAJIB buat ilustrasi SVG baru yang sesuai dengan topik baru atau kembalikan "gambar": null (DILARANG mempertahankan gambar lama yang tidak relevan). Jika catatan validator TIDAK menyinggung ilustrasi dan topik soal tetap sama, kembalikan "gambar": null (sistem akan mempertahankan ilustrasi asli). Jika catatan validator secara eksplisit meminta perbaikan visual, sertakan revisi "gambar" mengikuti salah satu format: {"tipe": "svg", "svg_content": "<svg viewBox=\\"0 0 480 300\\" width=\\"100%\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>", "deskripsi_alt": "..."} untuk geometri/denah bebas, atau {"tipe": "diagram", "archetype": "diagram_batang"|"diagram_lingkaran"|"model_pecahan"|"garis_bilangan", "data": {...}, "deskripsi_alt": "..."} untuk diagram data/pecahan/garis bilangan (parameter data mengikuti skema masing-masing archetype).
 7. PADA SOAL BENTUK PGK_MCMA (Pilihan Ganda Kompleks Multi-Jawaban):
@@ -1241,6 +1241,28 @@ ${formatCompetencyPlanPrompt(competencySlotPlans.slice(chunk1Count))}`;
     if (q.pembahasan) {
       const v = validateLatexDelimiters(q.pembahasan, "Pembahasan");
       if (!v.valid) reasons.push(v.error!);
+
+      // Deteksi kebocoran monolog internal / meta-reasoning AI pada pembahasan
+      const LEAK_PATTERNS = [
+        /aturan\s+PGK/i,
+        /tidak\s+boleh\s+semua\s+opsi\s+benar/i,
+        /mari\s+(kita\s+)?(ubah|ganti)\s+(teks\s+)?opsi/i,
+        /agar\s+opsi\s+[A-D]\s+(bernilai\s+)?salah/i,
+        /teks\s+opsi\s+[A-D]\s+diubah/i,
+        /pada\s+teks\s+opsi\s+[A-D]\s+di\s+atas\s+tertulis/i,
+        /sebagai\s+AI/i,
+        /saya\s+adalah\s+model\s+AI/i,
+        /sesuai\s+instruksi\s+prompt/i,
+        /cacat\s+desain\s+soal/i,
+      ];
+      for (const pattern of LEAK_PATTERNS) {
+        if (pattern.test(q.pembahasan)) {
+          reasons.push(
+            "Pembahasan memuat kebocoran monolog internal / meta-reasoning AI (proses koreksi prompt/opsi bocor ke pembahasan siswa)."
+          );
+          break;
+        }
+      }
     }
     if (Array.isArray(q.opsi)) {
       for (const op of q.opsi) {
