@@ -1,10 +1,10 @@
-﻿/**
+/**
  * Modul Validasi Karakteristik & Kompleksitas Teks Bacaan TKA
  * Berdasarkan Perkaban BSKAP No. 47/2025 (SD/MI & SMP/MTs) dan No. 45/2025 (SMA/MA & SMK/MAK).
  * 
  * ATURAN KERAS (HANYA BERLAKU UNTUK BAHASA INDONESIA / INGGRIS, DILEWATI TOTAL UNTUK MATEMATIKA):
  * - SD/MI: 150-200 kata; 3-7 kata/kalimat; HANYA kalimat tunggal pola dasar SPOK; TIDAK BOLEH kalimat majemuk.
- * - SMP/MTs: 200-250 kata; 5-9 kata/kalimat; kalimat tunggal berbagai pola DAN kalimat majemuk SETARA (dihubungkan kata seperti "dan", "tetapi", "atau" dengan kedudukan sejajar); TIDAK BOLEH kalimat majemuk bertingkat/kompleks dengan anak kalimat.
+ * - SMP/MTs: 200-250 kata; rata-rata 7-10 kata/kalimat (gerbang validasi 6-11); kalimat tunggal berbagai pola, majemuk setara, serta anak kalimat sederhana satu lapis; multi-paragraf (\n\n).
  * - SMA/MA & SMK/MAK: 250-300 kata; 8-12 kata/kalimat; kalimat kompleks berbagai pola dan kalimat inversi DIPERBOLEHKAN di jenjang ini saja.
  */
 
@@ -23,7 +23,7 @@ export const JENJANG_TEXT_CRITERIA: Record<string, JenjangTextCriteria> = {
   "SD/MI": {
     minWords: 150,
     maxWords: 200,
-    minWordsPerSentence: 3,
+    minWordsPerSentence: 5,
     maxWordsPerSentence: 7,
     allowComplexSentences: false,
     maxTechnicalTerms: 3,
@@ -31,9 +31,9 @@ export const JENJANG_TEXT_CRITERIA: Record<string, JenjangTextCriteria> = {
   "SMP/MTs": {
     minWords: 200,
     maxWords: 250,
-    minWordsPerSentence: 5,
-    maxWordsPerSentence: 9,
-    allowComplexSentences: false,
+    minWordsPerSentence: 7,
+    maxWordsPerSentence: 10,
+    allowComplexSentences: true,
     maxTechnicalTerms: 3,
   },
   "SMA/MA": {
@@ -126,9 +126,15 @@ export function isLanguageSubject(mapel: string): boolean {
   return lower.includes("indonesia") || lower.includes("inggris") || lower.includes("bahasa");
 }
 
+export function stripGlossaryBlock(text: string): string {
+  if (!text) return "";
+  return text.replace(/(?:\n\s*|\r\n\s*)(?:Daftar Istilah|Glosarium)\s*:\s*[\s\S]*$/i, "").trim();
+}
+
 export function countWords(text: string): number {
   if (!text) return 0;
-  const clean = text
+  const body = stripGlossaryBlock(text);
+  const clean = body
     .replace(/^#+\s.*$/gm, "")
     .replace(/[*_`]/g, " ")
     .trim();
@@ -139,7 +145,8 @@ export function countWords(text: string): number {
 
 export function splitSentences(text: string): string[] {
   if (!text) return [];
-  const clean = text
+  const body = stripGlossaryBlock(text);
+  const clean = body
     .replace(/^#+\s.*$/gm, "")
     .replace(/\r\n/g, "\n")
     .trim();
@@ -265,7 +272,9 @@ export function validateLanguageTextComplexity(options: {
   const WORDS_PER_SENTENCE_TOLERANCE = 1; // +-1 kata/kalimat dari rentang resmi
   const wordMinTolerant = Math.round(criteria.minWords * (1 - WORD_COUNT_TOLERANCE_RATIO));
   const wordMaxTolerant = Math.round(criteria.maxWords * (1 + WORD_COUNT_TOLERANCE_RATIO));
-  const wpsMinTolerant = criteria.minWordsPerSentence - WORDS_PER_SENTENCE_TOLERANCE;
+  // Gerbang validasi SD/MI tetap meloloskan batas toleran bawah 2 kata/kalimat (seperti teks resmi Kenthus 4,9) hingga batas atas 8
+  const wpsMinTolerant =
+    jenjang === "SD/MI" ? 2 : criteria.minWordsPerSentence - WORDS_PER_SENTENCE_TOLERANCE;
   const wpsMaxTolerant = criteria.maxWordsPerSentence + WORDS_PER_SENTENCE_TOLERANCE;
 
   if (wordCount < wordMinTolerant) {
@@ -296,12 +305,59 @@ export function validateLanguageTextComplexity(options: {
     );
   }
 
-  const isElementaryOrMiddle = jenjang === "SD/MI" || jenjang === "SMP/MTs";
+  // Pemeriksaan Paragraf (SD/MI & SMP/MTs: non-puisi/non-infografis wajib memiliki minimal 2 paragraf)
+  if (jenjang === "SD/MI" || jenjang === "SMP/MTs") {
+    const bodyOnly = stripGlossaryBlock(text);
+    const isPoetryOrVisual =
+      /^\s*(\*?\*?Puisi\b|Syair\b|Bait\b)/i.test(bodyOnly) ||
+      /\b(diagram|infografis|infografik|tabel)\b/i.test(bodyOnly);
+
+    if (!isPoetryOrVisual) {
+      const isDualText = /(?:\*\*Teks 1:|\bTeks 1\b)[\s\S]*(?:\*\*Teks 2:|\bTeks 2\b)/i.test(bodyOnly);
+
+      if (isDualText) {
+        const parts = bodyOnly.split(/(?:\*\*Teks 2:|\bTeks 2\b)/i);
+        const subParas = parts.map((part, idx) => {
+          let cleaned = part.replace(/^#+\s.*$/gm, "");
+          if (idx === 0) {
+            cleaned = cleaned.replace(/^\s*\*\*Teks 1:[^\n]*\n?/i, "");
+          } else {
+            cleaned = cleaned.replace(/^[^\n]*\n?/i, "");
+          }
+          return cleaned
+            .split(/\n\s*\n/)
+            .map((p) => p.trim())
+            .filter((p) => p.length > 0 && !/^(\*\*Teks \d|Teks \d)/i.test(p));
+        });
+        const totalParas = subParas.reduce((acc, p) => acc + p.length, 0);
+        if (totalParas < 2 || subParas.some((p) => p.length < 1)) {
+          reasons.push(
+            `Teks ganda antarteks jenjang ${jenjang} wajib memiliki pembagian paragraf yang jelas pada setiap sub-teks (dipisah jeda baris ganda \\n\\n).`
+          );
+        }
+      } else {
+        const paras = bodyOnly
+          .replace(/^#+\s.*$/gm, "")
+          .split(/\n\s*\n/)
+          .map((p) => p.trim())
+          .filter((p) => p.length > 0);
+
+        if (paras.length < 2) {
+          reasons.push(
+            `Teks bacaan tunggal jenjang ${jenjang} wajib memiliki minimal 2 paragraf (dipisahkan baris kosong \\n\\n) sesuai alur wacana, tidak boleh berupa satu blok kalimat bersambung.`
+          );
+        }
+      }
+    }
+  }
+
+  // Peringatan istilah teknis hanya diaktifkan untuk SD/MI (dimatikan total untuk SMP/MTs)
+  const isElementary = jenjang === "SD/MI";
   const { termsFound, unexplainedTerms } = analyzeTechnicalTerms(text);
 
-  if (isElementaryOrMiddle && unexplainedTerms.length > criteria.maxTechnicalTerms) {
+  if (isElementary && unexplainedTerms.length > criteria.maxTechnicalTerms) {
     warnings.push(
-      `[Peringatan Istilah Teknis] ${sourceLabel} memuat ${unexplainedTerms.length} istilah teknis tanpa kalimat penjelas definisi langsung (${unexplainedTerms.join(", ")}). Disarankan maksimal 2-3 istilah dengan kalimat penjelas terpisah pada kemunculan pertama.`
+      `[Peringatan Istilah Teknis] ${sourceLabel} memuat ${unexplainedTerms.length} istilah teknis tanpa penjelasan konteks atau aposisi langsung (${unexplainedTerms.join(", ")}). Disarankan maksimal 2-3 istilah dengan penjelasan yang menyatu dalam alur teks.`
     );
   }
 
@@ -321,4 +377,79 @@ export function validateLanguageTextComplexity(options: {
     warnings,
     metricsSummary,
   };
+}
+
+/**
+ * Memeriksa tumpang tindih kata berurutan antara teks kunci/pernyataan benar dengan kalimat stimulus.
+ * Digunakan sebagai peringatan kualitas ringan pada soal kompetensi Pemahaman Inferensial serta
+ * Evaluasi dan Apresiasi (SMP & SD) agar kunci diperoleh lewat menyimpulkan/menilai, bukan menyalin mentah teks.
+ *
+ * Ambang default: 0.8 (≥80% kata kunci muncul berurutan di salah satu kalimat stimulus,
+ * dengan panjang minimal kunci 4 kata untuk mencegah false positive pada kata benda pendek).
+ */
+export function checkInferensialKeyOverlap(
+  keyText: string,
+  stimulusText: string,
+  threshold = 0.8
+): { hasOverlap: boolean; ratio: number; matchingSentence?: string } {
+  if (!keyText || !stimulusText) {
+    return { hasOverlap: false, ratio: 0 };
+  }
+
+  // Tokenisasi teks kunci menjadi deretan kata
+  const keyWords = keyText
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (keyWords.length < 4) {
+    // Frasa sangat pendek (< 4 kata) diabaikan agar tidak false positive pada nama atau frasa singkat
+    return { hasOverlap: false, ratio: 0 };
+  }
+
+  // Pisahkan kalimat-kalimat pada stimulus
+  const stimulusSentences = stimulusText
+    .replace(/\r\n/g, "\n")
+    .split(/(?<=[.?!])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+
+  const targetRunLength = Math.ceil(keyWords.length * threshold);
+
+  for (const sentence of stimulusSentences) {
+    const sWords = sentence
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (sWords.length < targetRunLength) continue;
+
+    // Cari deretan kata berurutan terpanjang dari keyWords yang muncul dalam kalimat ini
+    let maxMatch = 0;
+    for (let kStart = 0; kStart <= keyWords.length - targetRunLength; kStart++) {
+      for (let kLen = keyWords.length - kStart; kLen >= targetRunLength; kLen--) {
+        const sub = keyWords.slice(kStart, kStart + kLen).join(" ");
+        const sJoined = sWords.join(" ");
+        if (sJoined.includes(sub)) {
+          if (kLen > maxMatch) {
+            maxMatch = kLen;
+          }
+          break;
+        }
+      }
+    }
+
+    if (maxMatch >= targetRunLength) {
+      const ratio = maxMatch / keyWords.length;
+      return {
+        hasOverlap: true,
+        ratio,
+        matchingSentence: sentence,
+      };
+    }
+  }
+
+  return { hasOverlap: false, ratio: 0 };
 }

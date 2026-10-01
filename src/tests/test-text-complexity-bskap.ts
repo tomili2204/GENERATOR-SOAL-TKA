@@ -1,4 +1,4 @@
-﻿import { validateLanguageTextComplexity, JENJANG_TEXT_CRITERIA } from "../lib/generator/text-complexity";
+import { validateLanguageTextComplexity, JENJANG_TEXT_CRITERIA } from "../lib/generator/text-complexity";
 
 async function runTests() {
   console.log("=== UJI VALIDASI TEKS WACANA BSKAP No. 47/2025 & No. 45/2025 ===");
@@ -68,6 +68,7 @@ Ayah membantu menyiram tanaman bunga.
 Ibu menanam bunga mawar merah.
 Bunga mawar mekar dengan harum.
 Kupu-kupu terbang di atas bunga.
+
 Si Belang suka mengejar kupu-kupu itu.
 Namun kupu-kupu terbang sangat tinggi.
 Si Belang akhirnya tidur di teras.
@@ -107,6 +108,7 @@ Mereka menanam ribuan bibit bakau baru di pesisir.
 Kegiatan reboisasi dilakukan secara terencana dan berkala.
 Reboisasi adalah kegiatan penanaman kembali kawasan hutan.
 Kelestarian bakau berdampak baik bagi warga sekitar pantai.
+
 Hasil tangkapan nelayan tradisional meningkat cukup pesat.
 Pendapatan keluarga nelayan kini menjadi jauh lebih baik.
 Kawasan pesisir ini juga dijadikan objek ekowisata bahari.
@@ -176,7 +178,7 @@ Burung camar kerap singgah bertengger di ranting pohon.`;
   // dalam toleransi (+-1) HARUS tetap diterima (dengan peringatan), tidak ditolak total.
   console.log("\n--- Kasus 6: Toleransi Rata-rata Kata/Kalimat (SD/MI, sedikit di atas batas) ---");
   const sdSentence8Words = "Budi dan teman-temannya bermain bola di lapangan sekolah.";
-  const sdToleranceText = Array(24).fill(sdSentence8Words).join(" ");
+  const sdToleranceText = `${Array(12).fill(sdSentence8Words).join(" ")}\n\n${Array(12).fill(sdSentence8Words).join(" ")}`;
   const sdToleranceRes = validateLanguageTextComplexity({
     rawJenjang: "SD/MI",
     mapel: "Bahasa Indonesia",

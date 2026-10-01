@@ -18,7 +18,13 @@ import { renderDiagramTemplate } from "./diagram-templates";
 import { generateMockGeminiBatchResponse as mockDataBatchResponse } from "./mock-data";
 import { selectThemeForGeneration } from "./theme-selector";
 import { normalizeJenjang } from "@/lib/jenjang-utils";
-import { validateLanguageTextComplexity, isLanguageSubject, countWords, formatWacanaCriteriaText } from "./text-complexity";
+import {
+  validateLanguageTextComplexity,
+  isLanguageSubject,
+  countWords,
+  formatWacanaCriteriaText,
+  checkInferensialKeyOverlap,
+} from "./text-complexity";
 import { jsonrepair } from "jsonrepair";
 import { fetchRecentQuestionsMemory } from "./sliding-window-memory";
 import { generateCompetencySlotPlan, formatCompetencyPlanPrompt, normalizeElemenName } from "./competency-plan";
@@ -73,6 +79,27 @@ export async function getStoredAiConfig(): Promise<StoredAiConfig> {
     strictSvgMode: false,
     nanoBananaEnabled: false,
   };
+}
+
+/**
+ * Normalisasi label kompetensi dan level kognitif Bahasa Indonesia agar selalu patuh
+ * pada 3 kompetensi resmi Perkaban BSKAP No. 47/2025. Jika LLM masih menghasilkan
+ * gaya PISA, otomatis dinormalisasi.
+ */
+export function normalizeLanguageCompetencyLabel(komp: string): string {
+  if (!komp) return komp;
+  return komp
+    .replace(/Mengakses(?:\s+dan\s+Menemukan\s+Informasi)?/gi, "Pemahaman Tekstual")
+    .replace(/Menginterpretasi(?:\s+dan\s+Mengintegrasi)?/gi, "Pemahaman Inferensial")
+    .replace(/Mengevaluasi(?:\s+dan\s+Merefleksi)?/gi, "Evaluasi dan Apresiasi");
+}
+
+export function normalizeLanguageLevelKognitif(lk: string): string {
+  if (!lk) return lk;
+  if (/mengakses/i.test(lk)) return "Pemahaman Tekstual";
+  if (/menginterpretasi/i.test(lk)) return "Pemahaman Inferensial";
+  if (/mengevaluasi/i.test(lk)) return "Evaluasi dan Apresiasi";
+  return lk;
 }
 
 /**
@@ -171,15 +198,49 @@ export async function callGeminiResilient(options: {
  * aturan format soal/SVG/kurikulum yang tidak relevan untuk tugas edit teks murni ini) supaya biaya
  * per-panggilan jauh lebih murah daripada 1 ronde regenerasi batch penuh.
  */
-async function repairStimulusWacana(
+export async function repairStimulusWacana(
   apiKey: string,
   preferredModel: string,
   originalText: string,
   jenjang: string,
   reasons: string[]
 ): Promise<{ success: true; repairedText: string } | { success: false }> {
-  const targetBand = formatWacanaCriteriaText(jenjang);
-  const systemInstruction = `Anda adalah editor Bahasa Indonesia. Tugas Anda HANYA memperbaiki panjang total dan struktur/panjang kalimat sebuah teks bacaan agar sesuai batas resmi jenjang pendidikan, TANPA mengubah fakta, angka, nama, tema, atau alur cerita di dalamnya. Jangan menambah informasi baru dan jangan menghilangkan informasi penting.`;
+  const normJenjang = normalizeJenjang(jenjang);
+  const targetBand = formatWacanaCriteriaText(normJenjang);
+  const isSmp = normJenjang === "SMP/MTs";
+  const isSd = normJenjang === "SD/MI";
+
+  const isOnlyParagraphIssue =
+    reasons.length > 0 &&
+    reasons.every((r) => r.toLowerCase().includes("paragraf"));
+
+  let systemInstruction = `Anda adalah editor Bahasa Indonesia. Tugas Anda HANYA memperbaiki panjang total, variasi panjang kalimat, dan pembagian paragraf sebuah teks bacaan agar sesuai batas resmi jenjang pendidikan, TANPA mengubah fakta, angka, nama, tema, atau alur cerita di dalamnya. Jangan menambah informasi baru dan jangan menghilangkan informasi penting.`;
+  let taskInstruction = "";
+
+  if (isOnlyParagraphIssue) {
+    systemInstruction = `Anda adalah editor tata letak wacana Bahasa Indonesia. Tugas Anda HANYA membagi teks menjadi minimal 2 paragraf logis dengan menyisipkan baris kosong ganda (\\n\\n) di antara paragraf, TANPA menulis ulang atau mengubah kata dan kalimat di dalamnya sama sekali.`;
+    taskInstruction = `Masalah pada teks ini HANYA pembagian paragraf (kurang dari 2 paragraf). JANGAN menulis ulang atau mengubah kata dan kalimat di dalamnya. Cukup bagi teks ini menjadi beberapa paragraf logis dengan menyisipkan baris kosong ganda (\\n\\n) pada batas alur wacana yang wajar.`;
+  } else if (isSmp) {
+    taskInstruction = `Target WAJIB dipenuhi: ${targetBand} (jenjang SMP/MTs).
+Aturan perbaikan teks SMP:
+1. DILARANG memotong kalimat menjadi pendek-pendek yang seragam. Variasikan panjang kalimat secara wajar (sebagian besar kalimat sedang, diselingi kalimat pendek untuk penekanan dan sesekali kalimat lebih panjang).
+2. Pertahankan atau buat pembagian teks menjadi beberapa paragraf logis (minimal 2 paragraf, dipisahkan baris kosong ganda \\n\\n).
+3. Pertahankan fakta, angka, nama, alur cerita, dan tema asli tanpa menambah informasi asing atau menghilangkan gagasan utama.
+4. Pastikan jumlah kata total tetap di rentang 200–250 kata dan rata-rata kata per kalimat di rentang 7–10 kata (gerbang validasi lolos 6–11).`;
+  } else if (isSd) {
+    taskInstruction = `Target WAJIB dipenuhi: ${targetBand} (jenjang SD/MI).
+Aturan perbaikan teks SD:
+1. Utamakan kalimat sederhana berpola dasar (SPOK). Panjang kalimat bervariasi secara wajar: sebagian besar kalimat pendek, diselingi kalimat sedang, dan sesekali kalimat lebih panjang dibolehkan. Hindari deretan kalimat yang panjangnya kaku atau seragam.
+2. Boleh sesekali memakai penghubung sederhana (dan, tetapi, karena, agar, yang).
+3. Pertahankan atau buat pembagian teks menjadi beberapa paragraf logis (minimal 2 paragraf, dipisahkan baris kosong ganda \\n\\n). Teks fabel atau cerita anak yang memuat dialog boleh memiliki lebih banyak paragraf pendek.
+4. Pertahankan fakta, angka, nama, alur cerita, dan tema asli tanpa menambah informasi asing atau menghilangkan gagasan utama.
+5. Pastikan jumlah kata total tetap di rentang 150–200 kata dan rata-rata kata per kalimat di rentang 5–7 kata (gerbang validasi lolos 2–8).`;
+  } else {
+    taskInstruction = `Target WAJIB dipenuhi: ${targetBand} (jenjang ${jenjang}). Kalimat dihitung berdasarkan tanda titik/tanya/seru.
+
+Tulis ulang teks ini agar tepat memenuhi target di atas, TANPA mengubah fakta/angka/nama/tema aslinya. Sebelum menjawab, hitung sendiri secara internal jumlah kata total dan rata-rata kata per kalimat hasil tulisan ulangmu; jika masih di luar target, revisi lagi sampai benar-benar sesuai sebelum mengirim jawaban.`;
+  }
+
   const userPrompt = `Teks bacaan berikut GAGAL validasi panjang wacana:
 """
 ${originalText}
@@ -188,9 +249,7 @@ ${originalText}
 Alasan gagal:
 ${reasons.map((r) => `- ${r}`).join("\n")}
 
-Target WAJIB dipenuhi: ${targetBand} (jenjang ${jenjang}). Kalimat dihitung berdasarkan tanda titik/tanya/seru.
-
-Tulis ulang teks ini agar tepat memenuhi target di atas, TANPA mengubah fakta/angka/nama/tema aslinya. Sebelum menjawab, hitung sendiri secara internal jumlah kata total dan rata-rata kata per kalimat hasil tulisan ulangmu; jika masih di luar target, revisi lagi sampai benar-benar sesuai sebelum mengirim jawaban.
+${taskInstruction}
 
 Balas HANYA dengan array JSON berisi satu objek, tanpa teks lain: [{"stimulus_text": "teks hasil perbaikan di sini"}]`;
 
@@ -480,7 +539,7 @@ export function getCurriculumPromptContext(jenjang: string, mapel: string): stri
   }
 
   if (isBin) {
-    return `\nSTRUKTUR PAKET: sebagian besar butir berupa soal grup (2–3 butir per stimulus). Panjang setiap teks: ${formatWacanaCriteriaText(jenjang)}. Wakili kedua taksonomi kompetensi (domestik dan PISA).`;
+    return `\nSTRUKTUR PAKET: sebagian besar butir berupa soal grup (2–3 butir per stimulus). Panjang setiap teks: ${formatWacanaCriteriaText(jenjang)}. Wakili ketiga kompetensi membaca resmi Perkaban BSKAP (Pemahaman Tekstual, Pemahaman Inferensial, Evaluasi dan Apresiasi).`;
   }
 
   return "";
@@ -1039,9 +1098,11 @@ ${formatCompetencyPlanPrompt(competencySlotPlans.slice(chunk1Count))}`;
 
   // 4. Petakan, Validasi Panjang & Kompleksitas Wacana BSKAP, dan Simpan Stimulus ke Database
   const stimulusIdMap: Record<string, string> = {};
+  const stimulusContentMap: Record<string, string> = {};
   const rejectedStimuli: Record<string, { reasons: string[]; metricsSummary: string }> = {};
   const textComplexityLogs: Array<{ index: number; reason: string; itemTitle?: string }> = [];
   const failedItems: Array<{ index: number; reason: string; itemTitle?: string }> = [];
+  const inferensialKeyWarnings: Array<{ index: number; reason: string; itemTitle?: string }> = [];
   let wacanaRepaired = 0;
   let wacanaRepairFailed = 0;
 
@@ -1141,6 +1202,7 @@ ${formatCompetencyPlanPrompt(competencySlotPlans.slice(chunk1Count))}`;
     });
 
     stimulusIdMap[tempId] = realStimId;
+    stimulusContentMap[tempId] = content;
   }
 
   // 5. Jalankan Gerbang Pemeriksaan Ketat pada Tiap Butir Soal
@@ -1156,6 +1218,12 @@ ${formatCompetencyPlanPrompt(competencySlotPlans.slice(chunk1Count))}`;
   questionObjects.forEach((q, idx) => {
     const itemNum = idx + 1;
     const reasons: string[] = [];
+
+    // Normalisasi kompetensi & level kognitif Bahasa Indonesia ke 3 label resmi Perkaban BSKAP
+    if (isLanguageSubject(mapel)) {
+      if (q.kompetensi) q.kompetensi = normalizeLanguageCompetencyLabel(q.kompetensi);
+      if (q.level_kognitif) q.level_kognitif = normalizeLanguageLevelKognitif(q.level_kognitif);
+    }
 
     // A. Kelengkapan Field Wajib
     const requiredFields = [
@@ -1517,6 +1585,7 @@ ${curriculumGuidance}`;
       });
 
       stimulusIdMap[tempId] = realStimId;
+      stimulusContentMap[tempId] = content;
     }
 
     const requiredFields = [
@@ -1537,6 +1606,12 @@ ${curriculumGuidance}`;
 
       if (q.stimulus_id_sementara) {
         q.stimulus_id_sementara = `retry-${retryAttempts}-${q.stimulus_id_sementara}`;
+      }
+
+      // Normalisasi kompetensi & level kognitif Bahasa Indonesia ke 3 label resmi Perkaban BSKAP
+      if (isLanguageSubject(mapel)) {
+        if (q.kompetensi) q.kompetensi = normalizeLanguageCompetencyLabel(q.kompetensi);
+        if (q.level_kognitif) q.level_kognitif = normalizeLanguageLevelKognitif(q.level_kognitif);
       }
 
       const qReasons: string[] = [];
@@ -1579,6 +1654,53 @@ ${curriculumGuidance}`;
         });
       }
     }
+  }
+
+  // 5B2. Pemeriksaan Ringan Kunci Soal Inferensial / Evaluasi (Langkah 5)
+  // Memeriksa apakah jawaban benar/pernyataan menyalin mentah (≥80% kata berurutan) kalimat stimulus.
+  // Hanya berupa PERINGATAN (warning), tidak menggagalkan soal.
+  if (isLanguageSubject(mapel)) {
+    validQuestions.forEach((vq, vIdx) => {
+      const qNum = vIdx + 1;
+      const normKomp = (vq.kompetensi || "").toLowerCase();
+      const isInferensialOrEvaluasi =
+        normKomp.includes("inferensial") || normKomp.includes("evaluasi");
+
+      if (isInferensialOrEvaluasi && vq.stimulus_id_sementara) {
+        const stimText = stimulusContentMap[vq.stimulus_id_sementara] || "";
+        if (stimText) {
+          const answerTexts: string[] = [];
+          if (vq.bentuk_soal === "PG" && Array.isArray(vq.opsi) && Array.isArray(vq.kunci_jawaban)) {
+            const correctOpt = vq.opsi.find((o: any) => o.label === vq.kunci_jawaban[0]);
+            if (correctOpt?.text) answerTexts.push(correctOpt.text);
+          } else if (vq.bentuk_soal === "PGK_MCMA" && Array.isArray(vq.opsi) && Array.isArray(vq.kunci_jawaban)) {
+            for (const k of vq.kunci_jawaban) {
+              const opt = vq.opsi.find((o: any) => o.label === k);
+              if (opt?.text) answerTexts.push(opt.text);
+            }
+          } else if (vq.bentuk_soal === "PGK_KATEGORI" && Array.isArray(vq.pernyataan) && Array.isArray(vq.kunci_jawaban)) {
+            vq.pernyataan.forEach((p: any, pIdx: number) => {
+              const ans = String(vq.kunci_jawaban[pIdx] || "").toLowerCase();
+              if (ans === "benar" || ans === "sesuai" || ans === "ya") {
+                if (p.text) answerTexts.push(p.text);
+              }
+            });
+          }
+
+          for (const ansText of answerTexts) {
+            const overlapRes = checkInferensialKeyOverlap(ansText, stimText, 0.8);
+            if (overlapRes.hasOverlap) {
+              inferensialKeyWarnings.push({
+                index: qNum,
+                reason: `[Peringatan Kunci Inferensial/Evaluasi] Butir #${qNum} berlabel "${vq.kompetensi}", namun kunci/pernyataan benar memiliki tumpang tindih kata berurutan ${Math.round(overlapRes.ratio * 100)}% (ambang: 80%) dengan kalimat stimulus: "${overlapRes.matchingSentence?.slice(0, 75)}...". Disarankan menyimpulkan secara tersirat daripada menyalin kalimat stimulus.`,
+                itemTitle: "Peringatan Kunci Inferensial/Evaluasi",
+              });
+              break;
+            }
+          }
+        }
+      }
+    });
   }
 
   if (wacanaRepaired > 0 || wacanaRepairFailed > 0) {
@@ -1630,7 +1752,7 @@ ${curriculumGuidance}`;
       totalDiterima: questionObjects.length,
       totalLolos: 0,
       totalGagal: failedItems.length,
-      detailPemeriksaan: [...failedItems, ...themeWarnings, ...textComplexityLogs],
+      detailPemeriksaan: [...failedItems, ...themeWarnings, ...textComplexityLogs, ...inferensialKeyWarnings],
       errorMessage: errMsg,
       triggeredBy,
       adminId: adminId || null,
@@ -1935,7 +2057,7 @@ ${curriculumGuidance}`;
     totalDiterima: questionObjects.length,
     totalLolos: validQuestions.length,
     totalGagal: failedItems.length,
-    detailPemeriksaan: [...failedItems, ...themeWarnings, ...similarityLogs, ...textComplexityLogs, ...nanoBananaLogs],
+    detailPemeriksaan: [...failedItems, ...themeWarnings, ...similarityLogs, ...textComplexityLogs, ...inferensialKeyWarnings, ...nanoBananaLogs],
     errorMessage: null,
     triggeredBy,
     adminId: adminId || null,

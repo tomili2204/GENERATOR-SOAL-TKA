@@ -50,42 +50,67 @@ function matematikaRules(jenjang: string): string {
 
 function kalimatRules(jenjang: string): string {
   if (jenjang.includes("SD")) {
-    return `Gunakan kalimat tunggal pendek berpola dasar (subjek-predikat-objek-keterangan). Jangan memakai kalimat majemuk.`;
+    return `Tulis teks yang mengalir alami dan mudah dipahami siswa SD/MI. Utamakan kalimat sederhana berpola dasar (subjek-predikat-objek-keterangan). Panjang kalimat bervariasi: sebagian besar kalimat pendek, diselingi kalimat sedang, dan sesekali kalimat lebih panjang dibolehkan. Hindari deretan kalimat yang panjangnya kaku atau sama persis.
+Boleh sesekali memakai penghubung sederhana (dan, tetapi, karena, agar, yang). Hindari anak kalimat bertingkat yang rumit atau berlapis-lapis.`;
   }
   if (jenjang.includes("SMP")) {
-    return `Campurkan kalimat tunggal dengan kalimat majemuk setara yang pendek (dihubungkan 'dan', 'tetapi', 'atau', 'serta'), agar teks mengalir alami dan tidak terasa seperti daftar fakta terpotong. Jangan memakai kalimat majemuk bertingkat (anak kalimat dengan 'yang', 'karena', 'meskipun', 'apabila' di tengah kalimat panjang). Menggabungkan klausa tidak boleh membuat rata-rata kata per kalimat melewati batas.
-Contoh benar (rata-rata 7 kata per kalimat): 'Koperasi sekolah menjual alat tulis setiap hari. Siswa bergiliran menjaga toko, dan guru mengawasi keuangan. Keuntungan koperasi dipakai untuk kegiatan sekolah.'`;
+    return `Tulis teks yang mengalir alami seperti teks bacaan resmi TKA SMP. Panjang kalimat bervariasi: sebagian besar kalimat sedang, diselingi kalimat pendek untuk penekanan dan sesekali kalimat lebih panjang. Hindari deretan kalimat yang panjangnya sama.
+Boleh memakai kalimat majemuk setara dan anak kalimat sederhana satu lapis (karena, bahwa, agar, yang, jika). Hindari anak kalimat berlapis-lapis.`;
   }
   return `Kalimat kompleks berbagai pola dan kalimat inversi boleh dipakai, tetapi teks tetap mengalir dan tidak bertele-tele.`;
 }
 
 function bahasaRules(jenjang: string): string {
   const isSd = jenjang.includes("SD");
+  const isSmp = jenjang.includes("SMP");
   const jenisTeks = isSd
     ? "teks informasi tentang hal sehari-hari dan teks fiksi anak (cerita, fabel, puisi) berlatar konkret"
-    : jenjang.includes("SMP")
+    : isSmp
     ? "teks informasi (ulasan, berita, prosedur, laporan, infografik sederhana) dan teks fiksi (cerita realistis, puisi, biografi singkat)"
     : "teks informasi jamak dan analitis serta teks sastra";
 
+  const aturanParagrafDanKohesi = isSmp
+    ? `\n- Bagi teks tunggal menjadi beberapa paragraf (\\n\\n) sesuai alur jenis teksnya. Teks fiksi berdialog boleh memiliki lebih banyak paragraf pendek.
+- Jaga kohesi dengan penggantian acuan (sinonim, kata ganti, "hal tersebut", sebutan lain untuk tokoh/benda) agar kata yang sama tidak berulang di setiap kalimat. Pakai penghubung antarparagraf yang wajar, termasuk makna perbandingan (sementara itu, sebaliknya, demikian pula) dan penekanan (bahkan, apalagi, terlebih lagi).
+- Sisakan informasi tersirat agar ada bahan soal inferensial: sebab yang tidak disebut langsung, sikap atau watak tokoh yang tampak dari tindakan, dan perasaan yang ditunjukkan lewat gambaran, bukan semuanya dinyatakan ("merasa cemas", "merasa senang").
+- Teks fiksi SMP sesuai Perkaban: tokoh berkarakter bulat, konflik tunggal atau jamak dengan penyelesaian tertutup, alur boleh campuran, sudut pandang orang ketiga.`
+    : isSd
+    ? `\n- Bagi teks tunggal menjadi beberapa paragraf (\\n\\n) sesuai alur jenis teksnya. Teks fabel atau cerita anak yang memuat dialog boleh memiliki lebih banyak paragraf pendek.
+- Jaga kohesi pengacuan dengan kata ganti atau sebutan tokoh yang wajar. Pakai konjungsi antarparagraf penambahan dan penjelasan (selain itu, oleh karena itu, kemudian, selanjutnya, namun).
+- Sisakan informasi tersirat agar ada bahan soal inferensial: sebab yang tidak disebut langsung atau sikap/watak tokoh yang tampak dari tindakan nyata, bukan semuanya dinyatakan secara gamblang.`
+    : "";
+
+  const aturanIstilah = isSmp
+    ? `- Istilah: JANGAN menyisipkan kalimat definisi ("X adalah ...") untuk kata yang lazim dikenal siswa SMP. Makna istilah teknis sebaiknya dapat dipahami dari konteks. Untuk istilah asing atau sangat khusus, tambahkan blok di akhir stimulus dengan format persis:\nDaftar Istilah:\nistilah: makna singkat`
+    : isSd
+    ? `- Istilah: Penjelasan istilah boleh menyatu mengalir dalam teks bila konsep itu memang topik bahasan teks (seperti pola teks resmi: "... yaitu hewan pemakan tumbuhan", "Mereka disebut folivora"). JANGAN menyisipkan kalimat definisi terpisah untuk kata yang sudah lazim dikenal anak SD.`
+    : `- Paling banyak 2–3 istilah baru per teks, masing-masing dijelaskan dalam satu kalimat saat pertama muncul.`;
+
+  const aturanCekPanjang = isSmp
+    ? `- Sebelum menjawab, periksa jumlah kata total setiap teks; revisi dulu bila di luar rentang 200–250 kata.`
+    : isSd
+    ? `- Sebelum menjawab, periksa jumlah kata total setiap teks; revisi dulu bila di luar rentang 150–200 kata.`
+    : `- Sebelum menjawab, periksa jumlah kata total setiap teks; revisi dulu bila di luar rentang.`;
+
+  const syaratKunciInferensial = `\nSYARAT KUNCI JAWABAN SOAL INFERENSIAL & EVALUASI:
+- Untuk soal berlabel Pemahaman Inferensial serta Evaluasi dan Apresiasi: jawaban benar HARUS diperoleh dengan menyimpulkan atau menilai — misalnya memadukan dua informasi atau lebih, menyimpulkan dari tindakan atau gambaran, atau mengevaluasi gagasan.
+- Kunci jawaban DILARANG KERAS berupa kalimat atau frasa yang tersalin hampir sama dari teks bacaan. Jika jawaban tertulis eksplisit di teks, soal itu termasuk Pemahaman Tekstual dan wajib diberi label Pemahaman Tekstual.`;
+
   return `KETENTUAN BAHASA:
-Kompetensi membaca memakai DUA taksonomi resmi Pusmendik yang sama-sama berlaku; keduanya harus terwakili dalam satu paket:
-A. Taksonomi domestik (terutama untuk teks fiksi):
-   - Pemahaman Tekstual: informasi tersurat, kosakata, menyusun kembali informasi.
-   - Pemahaman Inferensial: ide pokok, amanat, watak tokoh, hubungan sebab-akibat, memprediksi, makna kias.
-   - Evaluasi dan Apresiasi: relevansi dengan kehidupan, fakta dan opini, tanggapan emosional-estetis.
-B. Taksonomi PISA (terutama untuk teks informasi dan stimulus dua teks):
-   - Mengakses dan Menemukan Informasi: menemukan informasi tersurat, termasuk dari tabel atau diagram.
-   - Menginterpretasi dan Mengintegrasi: memadukan informasi antarbagian teks atau antarteks.
-   - Mengevaluasi dan Merefleksi: menilai kualitas, kredibilitas, atau argumen teks dan mengaitkannya dengan pengalaman.
-Isi field "kompetensi" dengan nama salah satu dari enam kompetensi di atas, boleh diikuti keterangan singkat (contoh: "Menginterpretasi dan Mengintegrasi: membandingkan informasi dua teks").
+Tiga kompetensi membaca resmi Perkaban BSKAP No. 47/2025 (wajib terwakili secara seimbang dalam satu paket):
+1. Pemahaman Tekstual: memahami informasi eksplisit/tersurat, mengelompokkan istilah bidang/kosakata, mengidentifikasi objek/latar berdasar teks fiksi/nonfiksi, menyusun kembali informasi dalam ikhtisar/bagan.
+2. Pemahaman Inferensial: menyimpulkan ide pokok, gagasan utama, amanat, watak tokoh, hubungan kelogisan/sebab-akibat antarperistiwa, memprediksi kejadian, menafsirkan bahasa kias/citraan, memadukan informasi antarbagian teks atau antarteks.
+3. Evaluasi dan Apresiasi: menilai relevansi peristiwa teks dengan kehidupan sehari-hari, menilai kesesuaian/keakuratan unsur atau fakta vs opini, menilai kredibilitas atau argumen teks, merespons secara emosional-estetis.
+Isi field "kompetensi" dengan nama salah satu dari tiga kompetensi di atas, boleh diikuti keterangan singkat subkompetensi spesifik (contoh: "Pemahaman Inferensial: menyimpulkan hubungan sebab-akibat" atau "Pemahaman Inferensial: membandingkan informasi dua teks").
+${syaratKunciInferensial}
 
 TEKS BACAAN JENJANG ${jenjang}:
 - Jenis teks: ${jenisTeks}.
-- Panjang dan rata-rata kalimat WAJIB: ${formatWacanaCriteriaText(jenjang)}. Jumlah kata di luar rentang (terlalu pendek maupun terlalu panjang) membuat stimulus ditolak sistem.
-- ${kalimatRules(jenjang)}
+- Panjang teks WAJIB: ${formatWacanaCriteriaText(jenjang)}. Jumlah kata di luar rentang membuat stimulus ditolak sistem.
+- ${kalimatRules(jenjang)}${aturanParagrafDanKohesi}
 - Tingkat kesulitan dinaikkan lewat isi (dua informasi yang perlu dibandingkan pembaca, sebab-akibat tersirat, data yang perlu dipadukan), bukan lewat kalimat yang lebih panjang atau rumit.
-- Paling banyak 2–3 istilah baru per teks, masing-masing dijelaskan dalam satu kalimat saat pertama muncul (contoh: 'Galah adalah tongkat bambu panjang.').
-- Sebelum menjawab, hitung sendiri jumlah kata dan rata-rata kata per kalimat setiap teks; revisi dulu bila di luar rentang.
+- ${aturanIstilah}
+- ${aturanCekPanjang}
 - Sekitar 1 dari setiap 3–4 stimulus berupa DUA TEKS BERKAITAN yang dibandingkan (misalnya dua ulasan atau dua berita dengan sudut pandang berbeda), dengan format konten "**Teks 1: Judul**\\n...\\n\\n**Teks 2: Judul**\\n...". Panjang total kedua teks tetap mengikuti rentang di atas, dan minimal 1–2 butir dalam grup itu meminta perbandingan antarteks.`;
 }
 

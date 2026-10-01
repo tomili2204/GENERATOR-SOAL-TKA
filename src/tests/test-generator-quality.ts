@@ -40,8 +40,8 @@ async function runQualityTests() {
     assert(!/arkeolog|pilot drone|teknisi menara/i.test(prompt), `${label}: does not name specific banned professions (anchoring)`);
   }
   assert(matSmp.includes("KETENTUAN MATEMATIKA") && !matSmp.includes("KETENTUAN BAHASA"), "MAT prompt carries only math rules");
-  assert(binSmp.includes("KETENTUAN BAHASA") && !binSmp.includes("KETENTUAN MATEMATIKA"), "BIN prompt carries only language rules");
-  assert(binSmp.includes("Pemahaman Tekstual") && binSmp.includes("Mengakses dan Menemukan Informasi"), "BIN prompt contains both domestic and PISA taxonomies");
+  assert(binSmp.includes("Pemahaman Tekstual") && binSmp.includes("Pemahaman Inferensial") && binSmp.includes("Evaluasi dan Apresiasi"), "BIN prompt contains official Perkaban BSKAP 3-competency taxonomy");
+  assert(!binSmp.includes("Mengakses dan Menemukan Informasi") && !binSmp.includes("Menginterpretasi dan Mengintegrasi") && !binSmp.includes("Mengevaluasi dan Merefleksi"), "BIN prompt has removed PISA-style taxonomy labels");
   assert(binSmp.includes("200-250 kata"), "SMP BIN prompt uses SMP text length");
   assert(binSma.includes("250-300 kata") && !binSma.includes("200-250 kata"), "SMA BIN prompt uses SMA text length (not SMP)");
 
