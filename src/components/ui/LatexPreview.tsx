@@ -139,16 +139,20 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className =
       const badgeSalah = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11.5px] font-bold bg-rose-100 text-rose-800 border border-rose-300/80 align-middle select-none">✗ Salah</span>';
 
       // 1. Dalam tanda kurung / siku: (Benar), [Benar], (Tepat), (Salah), [Salah], dsb.
-      text = text.replace(/[\(\[](?:Benar|Tepat)[\)\]]/gi, badgeBenar);
-      text = text.replace(/[\(\[](?:Salah|Tidak Tepat|Keliru)[\)\]]/gi, badgeSalah);
+      text = text.replace(/[\(\[](?:Benar|Tepat|BENAR)[\)\]]/g, badgeBenar);
+      text = text.replace(/[\(\[](?:Salah|Tidak Tepat|Keliru|SALAH)[\)\]]/g, badgeSalah);
 
-      // 2. Standalone huruf kapital di akhir kalimat / sebelum tanda baca: BENAR. atau SALAH.
-      text = text.replace(/(?<=[\.\,\;\:\s\)])\bBENAR\b\.?(?=\s|$|<)/g, badgeBenar);
-      text = text.replace(/(?<=[\.\,\;\:\s\)])\bSALAH\b\.?(?=\s|$|<)/g, badgeSalah);
+      // 2. Evaluasi eksplisit di akhir kalimat / baris (misal: "... 72,5%. BENAR." atau "... koin. SALAH.")
+      // Perhatian: Wajib menggunakan (?<![-a-zA-Z]) dan (?!-) agar kata ulang seperti "BENAR-BENAR" TIDAK terpicu!
+      text = text.replace(/(?<![-a-zA-Z])(?<=\.|\))\s*\b(BENAR)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, ` ${badgeBenar}`);
+      text = text.replace(/(?<![-a-zA-Z])(?<=\.|\))\s*\b(SALAH)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, ` ${badgeSalah}`);
 
-      // 3. Setelah tanda titik dua / panah / strip: ": Benar", "-> Salah", "— Benar"
-      text = text.replace(/(?<=[:\->\–\—]\s*)\b(?:Benar|Tepat)\b\.?(?=\s|$|<)/gi, badgeBenar);
-      text = text.replace(/(?<=[:\->\–\—]\s*)\b(?:Salah|Tidak Tepat|Keliru)\b\.?(?=\s|$|<)/gi, badgeSalah);
+      // 3. Evaluasi setelah tanda titik dua / panah / strip panjang di akhir baris (misal: "Pernyataan 1: BENAR", "-> Salah")
+      text = text.replace(/(?<![-a-zA-Z])(?<=\:|\-\>|\—|\–)\s*\b(Benar|Tepat|BENAR)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, ` ${badgeBenar}`);
+      text = text.replace(/(?<![-a-zA-Z])(?<=\:|\-\>|\—|\–)\s*\b(Salah|Tidak Tepat|Keliru|SALAH)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, ` ${badgeSalah}`);
+
+      // 4. Evaluasi title-case di akhir kalimat (misal: "... sudah sesuai. Benar.")
+      text = text.replace(/(?<![-a-zA-Z])(?<=\.\s*)\b(Benar|Salah)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, (_m, word) => word.toLowerCase() === 'benar' ? ` ${badgeBenar}` : ` ${badgeSalah}`);
 
       // (k) Tebalkan label opsi di awal baris agar mudah dibedakan (misal: A), B) atau 1), 2))
       text = text.replace(/(^|\n+)((?:Opsi\s+|Pilihan\s+|Pernyataan\s+)?[A-E][\)\.\:\-]\s*|\([A-E]\)\s*|\[[A-E]\]\s*)/gi, "$1<strong>$2</strong>");
