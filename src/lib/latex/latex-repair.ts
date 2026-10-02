@@ -61,6 +61,10 @@ export function repairLatexString(content: string): string {
   text = text.replace(/\\n\s*\\nabla\b/g, "\\nabla");
   text = text.replace(/\\n(?![a-zA-Z])/g, " ");
   text = text.replace(/\\f\s*\\frac\b/g, "\\frac");
+  // Perbaiki kasus stray "\d\frac", "\d \frac", "\t\frac", "\c\frac"
+  text = text.replace(/\\d\s*\\frac\b/g, "\\dfrac");
+  text = text.replace(/\\t\s*\\frac\b/g, "\\tfrac");
+  text = text.replace(/\\c\s*\\frac\b/g, "\\cfrac");
 
   // 3. Perbaiki Backspace (\x08) yang berasal dari \beta, \bar, \begin, \bullet
   text = text.replace(/\x08eta/g, "\\beta");
@@ -133,8 +137,8 @@ export function repairLatexString(content: string): string {
       // Normalisasi persen di luar math mode agar tidak muncul literal backslash misal (20\%) -> (20%)
       s = s.replace(/\\%/g, "%");
 
-      // Auto-wrap pecahan campuran misal "1 \frac{3}{4}" atau pecahan biasa "\frac{1}{2}"
-      s = s.replace(/((?:\d+\s+)?\\frac\{[^{}]+\}\{[^{}]+\})/g, (_m, f) => `$${f.trim()}$`);
+      // Auto-wrap pecahan campuran misal "1 \frac{3}{4}" atau pecahan biasa "\frac{1}{2}" / "\dfrac{1}{2}"
+      s = s.replace(/((?:\d+\s+)?\\(?:d|t|c)?frac\{[^{}]+\}\{[^{}]+\})/g, (_m, f) => `$${f.trim()}$`);
       // Auto-wrap akar "\sqrt{...}"
       s = s.replace(/(\\sqrt\{[^{}]+\})/g, (_m, sq) => `$${sq.trim()}$`);
       // Auto-wrap operator perkalian telanjang
@@ -163,14 +167,21 @@ export function repairLatexString(content: string): string {
     repairedMath = repairedMath.replace(/\t+/g, " ");
     // Perbaiki operator perkalian jika belum ada backslash
     repairedMath = repairedMath.replace(/(?<!\\)\btimes\b/g, "\\times");
-    // Perbaiki pecahan yang hilang backslash
-    repairedMath = repairedMath.replace(/(^|[^\\])frac\{/g, "$1\\frac{");
+    // Normalisasi artefak \d\frac jika tersisa di dalam math mode
+    repairedMath = repairedMath.replace(/\\d\s*\\frac\{/g, "\\dfrac{");
+    repairedMath = repairedMath.replace(/\\t\s*\\frac\{/g, "\\tfrac{");
+    repairedMath = repairedMath.replace(/\\c\s*\\frac\{/g, "\\cfrac{");
+    // Perbaiki pecahan yang hilang backslash (pastikan BUKAN diawali huruf seperti d pada dfrac, t pada tfrac, c pada cfrac)
+    repairedMath = repairedMath.replace(/(^|[^a-zA-Z\\])dfrac\{/g, "$1\\dfrac{");
+    repairedMath = repairedMath.replace(/(^|[^a-zA-Z\\])tfrac\{/g, "$1\\tfrac{");
+    repairedMath = repairedMath.replace(/(^|[^a-zA-Z\\])cfrac\{/g, "$1\\cfrac{");
+    repairedMath = repairedMath.replace(/(^|[^a-zA-Z\\])frac\{/g, "$1\\frac{");
     // Perbaiki akar yang hilang backslash
-    repairedMath = repairedMath.replace(/(^|[^\\])sqrt\{/g, "$1\\sqrt{");
+    repairedMath = repairedMath.replace(/(^|[^a-zA-Z\\])sqrt\{/g, "$1\\sqrt{");
     // Perbaiki text yang hilang backslash
-    repairedMath = repairedMath.replace(/(^|[^\\])text\{/g, "$1\\text{");
+    repairedMath = repairedMath.replace(/(^|[^a-zA-Z\\])text\{/g, "$1\\text{");
     // Perbaiki cdot yang hilang backslash
-    repairedMath = repairedMath.replace(/(^|[^\\])cdot\b/g, "$1\\cdot");
+    repairedMath = repairedMath.replace(/(^|[^a-zA-Z\\])cdot\b/g, "$1\\cdot");
 
     // Hilangkan spasi berlebih pada koma desimal Indonesia di dalam KaTeX: misal 310.000,00 -> 310.000{,}00
     repairedMath = repairedMath.replace(/(\d+),(\d+)/g, "$1{,}$2");
@@ -294,6 +305,10 @@ export function preprocessJsonForLatex(rawText: string): string {
   // Cari semua backslash yang diikuti oleh perintah LaTeX di dalam raw JSON string
   // Daftar perintah LaTeX matematika umum:
   const latexCommands = [
+    "dfrac",
+    "tfrac",
+    "cfrac",
+    "sfrac",
     "frac",
     "times",
     "text",
