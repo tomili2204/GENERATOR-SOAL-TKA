@@ -2,19 +2,19 @@
   "crons": [
     {
       "path": "/api/cron/generate?configId=gen-sd-mat",
-      "schedule": "0 22 * * *"
+      "schedule": "0 20 * * *"
     },
     {
       "path": "/api/cron/generate?configId=gen-sd-indo",
-      "schedule": "5 22 * * *"
+      "schedule": "30 20 * * *"
     },
     {
       "path": "/api/cron/generate?configId=gen-smp-mat",
-      "schedule": "10 22 * * *"
+      "schedule": "0 21 * * *"
     },
     {
       "path": "/api/cron/generate?configId=gen-smp-indo",
-      "schedule": "15 22 * * *"
+      "schedule": "30 21 * * *"
     }
   ]
 }

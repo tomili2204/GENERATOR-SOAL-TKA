@@ -1022,22 +1022,34 @@ ${formatCompetencyPlanPrompt(competencySlotPlans.slice(chunk1Count))}`;
           p2 += `\n\nFokus/Instruksi konteks tambahan: ${options.customInstruction.trim()}`;
         }
 
+        // Paralelisasi Sub-Batch: Jalankan Bagian 1 dan Bagian 2 secara simultan (paralel)
+        // memangkas waktu tunggu dari ~140 detik menjadi ~70 detik.
         // Jika salah satu bagian gagal, hasil bagian lain tetap dipakai dan kekurangannya diisi
-        // oleh mekanisme regenerasi — sebelumnya satu bagian gagal membuang seluruh paket.
+        // oleh mekanisme regenerasi otomatis (retry loop).
+        const [res1, res2] = await Promise.allSettled([
+          callAndParse(p1),
+          callAndParse(p2),
+        ]);
+
         let arr1: any[] = [];
         let arr2: any[] = [];
-        let chunkError: any = null;
-        try {
-          arr1 = await callAndParse(p1);
-        } catch (err) {
-          chunkError = err;
-          console.warn("[Generate] Bagian 1 gagal, melanjutkan dengan bagian 2:", (err as Error).message);
+
+        if (res1.status === "fulfilled") {
+          arr1 = res1.value;
+        } else {
+          console.warn("[Generate] Bagian 1 gagal, melanjutkan dengan bagian 2:", res1.reason?.message || res1.reason);
         }
-        try {
-          arr2 = await callAndParse(p2);
-        } catch (err) {
-          if (chunkError) throw chunkError;
-          console.warn("[Generate] Bagian 2 gagal, melanjutkan dengan bagian 1:", (err as Error).message);
+
+        if (res2.status === "fulfilled") {
+          arr2 = res2.value;
+        } else {
+          console.warn("[Generate] Bagian 2 gagal, melanjutkan dengan bagian 1:", res2.reason?.message || res2.reason);
+        }
+
+        if (res1.status === "rejected" && res2.status === "rejected") {
+          throw new Error(
+            `Kedua sub-batch gagal: Bagian 1 (${res1.reason?.message || res1.reason}), Bagian 2 (${res2.reason?.message || res2.reason})`
+          );
         }
 
         // Hindari tabrakan ID stimulus sementara antarsub-batch
