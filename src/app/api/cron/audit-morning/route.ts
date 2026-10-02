@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { questionPackages, questions, stimulus } from "@/db/schema";
-import { sql, desc, gte, inArray, eq } from "drizzle-orm";
+import { sql, desc, gte, inArray, eq, and, notLike } from "drizzle-orm";
 import { sendWhatsAppMessage } from "@/lib/notifications/fonnte";
 
 export const dynamic = "force-dynamic";
@@ -31,21 +31,27 @@ export async function GET(req: NextRequest) {
     const now = new Date();
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    // 2. Ambil paket-paket terbaru yang dibuat dalam 24 jam terakhir
+    // 2. Ambil paket-paket resmi terbaru yang dibuat dalam 24 jam terakhir (kecualikan paket DRAFT dev)
     const recentPackages = await db
       .select()
       .from(questionPackages)
-      .where(gte(questionPackages.createdAt, since24h))
+      .where(
+        and(
+          gte(questionPackages.createdAt, since24h),
+          notLike(questionPackages.code, "DRAFT-%")
+        )
+      )
       .orderBy(desc(questionPackages.createdAt))
-      .limit(10);
+      .limit(4);
 
-    // Jika tidak ada paket dalam 24 jam terakhir (misal weekend/libur), ambil 4 paket paling akhir
+    // Jika tidak ada paket dalam 24 jam terakhir (misal weekend/libur), ambil 4 paket resmi paling akhir
     let targetPackages = recentPackages;
     let isLatestFallback = false;
     if (targetPackages.length === 0) {
       targetPackages = await db
         .select()
         .from(questionPackages)
+        .where(notLike(questionPackages.code, "DRAFT-%"))
         .orderBy(desc(questionPackages.createdAt))
         .limit(4);
       isLatestFallback = true;
