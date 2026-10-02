@@ -126,15 +126,31 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className =
       // (g) Pecah baris sebelum catatan dalam kurung: (Koreksi: ...), (Catatan: ...)
       text = text.replace(/\s+(?=\((?:Koreksi|Catatan):)/gi, "\n");
 
-      // (h) Dukungan Markdown tebal (**teks**) dan miring (*teks*)
+      // (h) Bersihkan penomoran ganda redundan (misal: "1. Opsi A:" -> "Opsi A:", "1. A. " -> "A. ")
+      text = text.replace(/(^|\n+)\s*\d+[\.\)]\s*(?=(?:Opsi|Pilihan|Pernyataan)\s+[A-E0-9]+[:\.\)\-]|Opsi\s+\d+|Pilihan\s+\d+)/gi, "$1");
+      text = text.replace(/(^|\n+)\s*\d+[\.\)]\s*(?=[A-E][\.\)][\s:])/g, "$1");
+
+      // (i) Dukungan Markdown tebal (**teks**) dan miring (*teks*)
       text = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
       text = text.replace(/\*(.*?)\*/g, "<em>$1</em>");
 
-      // (i) Beri highlight lembut untuk penanda validitas (Benar) dan (Salah) jika ada
-      text = text.replace(/\((?:Benar|Tepat)\)/gi, '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300 ml-1 font-sans">Benar</span>');
-      text = text.replace(/\((?:Salah|Tidak Tepat|Keliru)\)/gi, '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-300 ml-1 font-sans">Salah</span>');
+      // (j) Beri badge visual modern untuk penanda validitas Benar dan Salah
+      const badgeBenar = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300/80 align-middle select-none">✓ Benar</span>';
+      const badgeSalah = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11.5px] font-bold bg-rose-100 text-rose-800 border border-rose-300/80 align-middle select-none">✗ Salah</span>';
 
-      // (j) Tebalkan label opsi di awal baris agar mudah dibedakan (misal: A), B) atau 1), 2))
+      // 1. Dalam tanda kurung / siku: (Benar), [Benar], (Tepat), (Salah), [Salah], dsb.
+      text = text.replace(/[\(\[](?:Benar|Tepat)[\)\]]/gi, badgeBenar);
+      text = text.replace(/[\(\[](?:Salah|Tidak Tepat|Keliru)[\)\]]/gi, badgeSalah);
+
+      // 2. Standalone huruf kapital di akhir kalimat / sebelum tanda baca: BENAR. atau SALAH.
+      text = text.replace(/(?<=[\.\,\;\:\s\)])\bBENAR\b\.?(?=\s|$|<)/g, badgeBenar);
+      text = text.replace(/(?<=[\.\,\;\:\s\)])\bSALAH\b\.?(?=\s|$|<)/g, badgeSalah);
+
+      // 3. Setelah tanda titik dua / panah / strip: ": Benar", "-> Salah", "— Benar"
+      text = text.replace(/(?<=[:\->\–\—]\s*)\b(?:Benar|Tepat)\b\.?(?=\s|$|<)/gi, badgeBenar);
+      text = text.replace(/(?<=[:\->\–\—]\s*)\b(?:Salah|Tidak Tepat|Keliru)\b\.?(?=\s|$|<)/gi, badgeSalah);
+
+      // (k) Tebalkan label opsi di awal baris agar mudah dibedakan (misal: A), B) atau 1), 2))
       text = text.replace(/(^|\n+)((?:Opsi\s+|Pilihan\s+|Pernyataan\s+)?[A-E][\)\.\:\-]\s*|\([A-E]\)\s*|\[[A-E]\]\s*)/gi, "$1<strong>$2</strong>");
 
       // 7. Parse Markdown Tables sederhana jika ada baris bertanda pipe (|)
@@ -175,6 +191,46 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className =
               const bulletMatch = line.match(/^[-*•]\s+(.*)$/);
               processedLines.push(`<div class="flex items-start gap-2 ml-1 my-0.5"><span class="text-slate-400 select-none leading-relaxed">•</span><span class="flex-1">${bulletMatch ? bulletMatch[1] : line}</span></div>`);
             } else {
+              // Butir opsi jawaban / analisis pernyataan
+              const optionMatch = line.match(/^(?:<strong>)?(?:(Opsi|Pilihan|Pernyataan)\s+([A-E0-9]+)|([A-E]))(?:<\/strong>)?[:\.\)\-]?\s*(?:<\/strong>)?[:\s]*(.*)$/i);
+              if (optionMatch) {
+                const label = optionMatch[1] && optionMatch[2]
+                  ? `${optionMatch[1]} ${optionMatch[2]}`
+                  : `Opsi ${optionMatch[3]}`;
+                const body = optionMatch[4].replace(/^<\/strong>[:\s]*/, "");
+                processedLines.push(
+                  `<div class="flex items-start gap-2.5 my-2.5 pl-0.5 group">` +
+                    `<span class="inline-flex items-center justify-center px-2 py-0.5 rounded-md text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200/90 shrink-0 mt-0.5 select-none shadow-xs group-hover:bg-slate-200/70 transition-colors">${label}</span>` +
+                    `<div class="flex-1 leading-relaxed min-w-0">${body}</div>` +
+                  `</div>`
+                );
+                continue;
+              }
+
+              // Butir langkah berurutan (1. ..., 2. ...)
+              const numberedMatch = line.match(/^(?:<strong>)?(\d{1,2})[\.\)](?:<\/strong>)?\s+(.*)$/);
+              if (numberedMatch) {
+                const num = numberedMatch[1];
+                const body = numberedMatch[2].replace(/^<\/strong>[:\s]*/, "");
+                processedLines.push(
+                  `<div class="flex items-start gap-2.5 my-1.5 pl-0.5">` +
+                    `<span class="font-bold text-slate-600 shrink-0 min-w-[1.25rem] text-right select-none pt-px">${num}.</span>` +
+                    `<div class="flex-1 leading-relaxed min-w-0">${body}</div>` +
+                  `</div>`
+                );
+                continue;
+              }
+
+              // Simpulan / Penarikan kesimpulan utama
+              if (/^(?:Jadi|Kesimpulan|Simpulan|Dengan demikian)[:\s,]/i.test(line)) {
+                processedLines.push(
+                  `<div class="my-3 p-3 bg-indigo-50/60 border-l-4 border-indigo-500 rounded-r-lg text-slate-800 text-[13px] leading-relaxed font-medium shadow-xs">` +
+                    line +
+                  `</div>`
+                );
+                continue;
+              }
+
               processedLines.push(line);
             }
           }
