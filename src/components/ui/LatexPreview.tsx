@@ -106,22 +106,22 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className =
       // 6. Rasionalkan baris baru agar simbol dan narasi penjelasan tersusun rapi ke bawah
       // (a) Pecah baris sebelum penomoran butir: 1) ..., 2) ... atau 1. ..., 2. ... atau (1) ...
       // Perhatian: Simbol ':' TIDAK dimasukkan sebagai pemecah agar rasio/waktu seperti (40 : 10) atau 08:30 tidak terpecah
-      text = text.replace(/([\.\)\;\!\?]|benar|salah|tepat)\s+(?=(?:Pernyataan\s+|Langkah\s+)?(?:\d+[\)\.\-]\s+|\(\d+\)\s+|\[\d+\]\s+))/gi, "$1\n\n");
+      text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat)\s+(?=(?:Pernyataan\s+|Langkah\s+)?(?:\d+[\)\.\-]\s+|\(\d+\)\s+|\[\d+\]\s+))/gi, "$1\n\n");
 
       // (b) Pecah baris sebelum label opsi: A), B), C), D) / A., B. / A: / (A) / [A] / Opsi A / Pilihan A
-      text = text.replace(/([\.\)\;\!\?]|benar|salah|tepat|\d)\s+(?=(?:Opsi\s+|Pilihan\s+|Pernyataan\s+)?[A-E][\)\.\:\-]\s+|\([A-E]\)\s+|\[[A-E]\]\s+)/gi, "$1\n\n");
+      text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|\d)\s+(?=(?:Opsi\s+|Pilihan\s+|Pernyataan\s+)?[A-E][\)\.\:\-]\s+|\([A-E]\)\s+|\[[A-E]\]\s+)/gi, "$1\n\n");
 
       // (c) Pecah baris sebelum tahapan/langkah: Langkah 1:, Pernyataan 1:, Tahap 1:, Kasus 1:
-      text = text.replace(/([\.\)\;\!\?]|benar|salah|tepat|___KATEX_INLINE_\d+___)\s+(?=(?:Langkah|Pernyataan|Tahap|Kasus)\s+\d+[:\.\s])/gi, "$1\n\n");
+      text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|___KATEX_INLINE_\d+___)\s+(?=(?:Langkah|Pernyataan|Tahap|Kasus)\s+\d+[:\.\s])/gi, "$1\n\n");
 
       // (d) Pecah baris sebelum kata kunci struktur: Diketahui, Ditanya, Jawab, Penyelesaian, Rumus, Simpulan
-      text = text.replace(/([\.\)\;\!\?]|benar|salah|tepat|___KATEX_INLINE_\d+___)\s+(?=(?:Diketahui|Ditanya|Dijawab|Penyelesaian|Rumus|Analisis|Simpulan|Kesimpulan)[:\s])/gi, "$1\n\n");
+      text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|___KATEX_INLINE_\d+___)\s+(?=(?:Diketahui|Ditanya|Dijawab|Penyelesaian|Rumus|Analisis|Simpulan|Kesimpulan)[:\s])/gi, "$1\n\n");
 
       // (e) Pecah baris sebelum perhitungan matematis utama (asalkan bukan label opsi seperti A. atau 1.)
       text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)(\.|\))\s+(?=(?:Luas|Keliling|Volume|Panjang|Lebar|Tinggi|Jari-jari|Diameter)\s+[^.]+?=)/gi, "$1\n");
 
       // (f) Pecah baris untuk kalimat deduksi lanjutan: Selisih ..., Maka ..., Sehingga ..., Jadi ...
-      text = text.replace(/([\.\)\;\!\?]|benar|salah|tepat)\s+(?=(?:Selisih|Maka|Sehingga|Jadi|Dengan demikian|Berdasarkan perhitungan)\s+)/gi, "$1\n");
+      text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat)\s+(?=(?:Selisih|Maka|Sehingga|Jadi|Dengan demikian|Berdasarkan perhitungan)\s+)/gi, "$1\n");
 
       // (g) Pecah baris sebelum catatan dalam kurung: (Koreksi: ...), (Catatan: ...)
       text = text.replace(/\s+(?=\((?:Koreksi|Catatan):)/gi, "\n");
