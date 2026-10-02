@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Urutkan paket: SD-MAT, SD-BIN, SMP-MAT, SMP-BIN jika ada
-    targetPackages.sort((a, b) => a.code.localeCompare(b.code));
+    targetPackages.sort((a: any, b: any) => a.code.localeCompare(b.code));
 
     // 3. Analisis setiap paket
     interface PackageAuditDetail {
@@ -138,7 +138,7 @@ export async function GET(req: NextRequest) {
           .where(inArray(stimulus.id, Array.from(stimulusIds)));
         wacanaTotal = stList.length;
         for (const st of stList) {
-          const paras = (st.konten || "").split(/\n\s*\n/).filter((p) => p.trim().length > 0);
+          const paras = (st.konten || "").split(/\n\s*\n/).filter((p: string) => p.trim().length > 0);
           if (paras.length <= 1) wacanaSingle++;
         }
       }
@@ -171,9 +171,9 @@ export async function GET(req: NextRequest) {
     });
     const waktuWIB = formatter.format(now) + " WIB";
 
-    const allComplete = packageAudits.every((p) => p.totalSoal === 30);
-    const allBskapOk = packageAudits.every((p) => p.bskapPercentage === 100);
-    const totalLeaks = packageAudits.reduce((acc, p) => acc + p.aiMonologLeaks, 0);
+    const allComplete = packageAudits.every((p: PackageAuditDetail) => p.totalSoal === 30);
+    const allBskapOk = packageAudits.every((p: PackageAuditDetail) => p.bskapPercentage === 100);
+    const totalLeaks = packageAudits.reduce((acc: number, p: PackageAuditDetail) => acc + p.aiMonologLeaks, 0);
 
     const overallEmoji = allComplete && allBskapOk && totalLeaks === 0 ? "✅" : "⚠️";
     const headerTitle = isLatestFallback
@@ -186,7 +186,7 @@ export async function GET(req: NextRequest) {
 
     waMessage += `${overallEmoji} *STATUS PAKET ${isLatestFallback ? "TERAKHIR" : "PAGI INI"}*\n`;
 
-    packageAudits.forEach((p, idx) => {
+    packageAudits.forEach((p: PackageAuditDetail, idx: number) => {
       const isOk = p.totalSoal === 30 && p.bskapPercentage === 100;
       const icon = isOk ? "✅" : "⚠️";
       const mapelShort = p.mapel.toLowerCase().includes("matematika") ? "MAT" : "BIN";
