@@ -103,16 +103,31 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className =
       // 5. Kembalikan escaped dollar
       text = text.replace(/___ESCAPED_DOLLAR___/g, "$");
 
+      // 5a. Definisikan badge visual modern untuk penanda validitas Benar dan Salah
+      const badgeBenar = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300/80 align-middle select-none">✓ Benar</span>';
+      const badgeSalah = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11.5px] font-bold bg-rose-100 text-rose-800 border border-rose-300/80 align-middle select-none">✗ Salah</span>';
+
+      // 5b. Normalisasi butir nomor yang memuat evaluasi pernyataan di ujungnya
+      // Contoh: "1. Jangkauan ... (homogen). Pernyataan 1 BENAR."
+      // Diubah menjadi satu kesatuan rapi: "Pernyataan 1: Jangkauan ... (homogen). [✓ Benar]"
+      text = text.replace(/(^|\n+)\s*(\d+)[\.\)]\s*(.*?)(?:[\.\,\;]?\s*(?:maka|sehingga|berarti)?\s*Pernyataan\s+\2\s+(?:adalah\s+)?(BENAR|SALAH|Benar|Salah)\.?\s*)$/gim,
+        (_match, prefix, num, content, verdict) => {
+          const isBenar = /benar/i.test(verdict);
+          const badge = isBenar ? badgeBenar : badgeSalah;
+          return `${prefix}Pernyataan ${num}: ${content.trim()}. ${badge}`;
+        }
+      );
+
       // 6. Rasionalkan baris baru agar simbol dan narasi penjelasan tersusun rapi ke bawah
       // (a) Pecah baris sebelum penomoran butir: 1) ..., 2) ... atau 1. ..., 2. ... atau (1) ...
-      // Perhatian: Simbol ':' TIDAK dimasukkan sebagai pemecah agar rasio/waktu seperti (40 : 10) atau 08:30 tidak terpecah
       text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat)\s+(?=(?:Pernyataan\s+|Langkah\s+)?(?:\d+[\)\.\-]\s+|\(\d+\)\s+|\[\d+\]\s+))/gi, "$1\n\n");
 
       // (b) Pecah baris sebelum label opsi: A), B), C), D) / A., B. / A: / (A) / [A] / Opsi A / Pilihan A
       text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|\d)\s+(?=(?:Opsi\s+|Pilihan\s+|Pernyataan\s+)?[A-E][\)\.\:\-]\s+|\([A-E]\)\s+|\[[A-E]\]\s+)/gi, "$1\n\n");
 
       // (c) Pecah baris sebelum tahapan/langkah: Langkah 1:, Pernyataan 1:, Tahap 1:, Kasus 1:
-      text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|___KATEX_INLINE_\d+___)\s+(?=(?:Langkah|Pernyataan|Tahap|Kasus)\s+\d+[:\.\s])/gi, "$1\n\n");
+      // Perhatian: Jangan pecah jika Pernyataan \d+ diikuti kata BENAR/SALAH (karena itu evaluasi akhir, bukan awal langkah)
+      text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|___KATEX_INLINE_\d+___)\s+(?=(?:Langkah|Tahap|Kasus)\s+\d+[:\.\s]|Pernyataan\s+\d+[:\.\s](?!(?:adalah\s+)?(?:BENAR|SALAH|Benar|Salah)\b))/gi, "$1\n\n");
 
       // (d) Pecah baris sebelum kata kunci struktur: Diketahui, Ditanya, Jawab, Penyelesaian, Rumus, Simpulan
       text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|___KATEX_INLINE_\d+___)\s+(?=(?:Diketahui|Ditanya|Dijawab|Penyelesaian|Rumus|Analisis|Simpulan|Kesimpulan)[:\s])/gi, "$1\n\n");
@@ -120,8 +135,8 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className =
       // (e) Pecah baris sebelum perhitungan matematis utama (asalkan bukan label opsi seperti A. atau 1.)
       text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)(\.|\))\s+(?=(?:Luas|Keliling|Volume|Panjang|Lebar|Tinggi|Jari-jari|Diameter)\s+[^.]+?=)/gi, "$1\n");
 
-      // (f) Pecah baris untuk kalimat deduksi lanjutan: Selisih ..., Maka ..., Sehingga ..., Jadi ...
-      text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat)\s+(?=(?:Selisih|Maka|Sehingga|Jadi|Dengan demikian|Berdasarkan perhitungan)\s+)/gi, "$1\n");
+      // (f) Pecah baris sebelum penarikan kesimpulan akhir (misal: "Jadi, pernyataan...", "Jadi: Pernyataan...", "Kesimpulan:")
+      text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat)\s+(?=(?:Jadi[:,\s]+(?:pernyataan|jawaban|opsi|pilihan|kunci)|Kesimpulan|Simpulan)[:\s])/gi, "$1\n\n");
 
       // (g) Pecah baris sebelum catatan dalam kurung: (Koreksi: ...), (Catatan: ...)
       text = text.replace(/\s+(?=\((?:Koreksi|Catatan):)/gi, "\n");
@@ -134,10 +149,14 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className =
       text = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
       text = text.replace(/\*(.*?)\*/g, "<em>$1</em>");
 
-      // (j) Beri badge visual modern untuk penanda validitas Benar dan Salah
-      const badgeBenar = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300/80 align-middle select-none">✓ Benar</span>';
-      const badgeSalah = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11.5px] font-bold bg-rose-100 text-rose-800 border border-rose-300/80 align-middle select-none">✗ Salah</span>';
+      // Format umum Pernyataan X: BENAR / SALAH yang berdiri sendiri
+      text = text.replace(/Pernyataan\s+(\d+)[:\s]+(BENAR|SALAH)\.?/gi, (_m, num, verdict) => {
+        const isBenar = /benar/i.test(verdict);
+        const badge = isBenar ? badgeBenar : badgeSalah;
+        return `Pernyataan ${num}: ${badge}`;
+      });
 
+      // (j) Beri badge visual modern untuk penanda validitas Benar dan Salah
       // 1. Dalam tanda kurung / siku: (Benar), [Benar], (Tepat), (Salah), [Salah], dsb.
       text = text.replace(/[\(\[](?:Benar|Tepat|BENAR)[\)\]]/g, badgeBenar);
       text = text.replace(/[\(\[](?:Salah|Tidak Tepat|Keliru|SALAH)[\)\]]/g, badgeSalah);
@@ -158,13 +177,15 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className =
       text = text.replace(/(^|\n+)((?:Opsi\s+|Pilihan\s+|Pernyataan\s+)?[A-E][\)\.\:\-]\s*|\([A-E]\)\s*|\[[A-E]\]\s*)/gi, "$1<strong>$2</strong>");
 
       // 7. Parse Markdown Tables sederhana jika ada baris bertanda pipe (|)
-      const lines = text.split("\n");
+      const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
       const processedLines: string[] = [];
       let inTable = false;
       let tableRows: string[] = [];
 
       for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+        const line = lines[i];
+        const isLastLine = i === lines.length - 1;
+
         if (line.startsWith("|") && line.endsWith("|")) {
           inTable = true;
           tableRows.push(line);
@@ -225,8 +246,12 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className =
                 continue;
               }
 
-              // Simpulan / Penarikan kesimpulan utama
-              if (/^(?:Jadi|Kesimpulan|Simpulan|Dengan demikian)[:\s,]/i.test(line)) {
+              // Kesimpulan hanya untuk penutup akhir atau format resmi kesimpulan
+              const isConclusion = (
+                isLastLine && /^(?:Jadi|Dengan demikian)[:\s,]/i.test(line)
+              ) || /^(?:Jadi[:,\s]+(?:pernyataan|jawaban|opsi|pilihan|kunci)|Kesimpulan|Simpulan)[:\s]/i.test(line);
+
+              if (isConclusion) {
                 processedLines.push(
                   `<div class="my-3 p-3 bg-indigo-50/60 border-l-4 border-indigo-500 rounded-r-lg text-slate-800 text-[13px] leading-relaxed font-medium shadow-xs">` +
                     line +
