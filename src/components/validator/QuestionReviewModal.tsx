@@ -42,6 +42,59 @@ export function QuestionReviewModal({
   const isSelf = question.authorId === currentUserId;
   const payload = question.payload || {};
 
+  const [isFormattingPembahasan, setIsFormattingPembahasan] = useState(false);
+  const [currentPembahasan, setCurrentPembahasan] = useState(payload.pembahasan || "");
+  const [formatSuccessMsg, setFormatSuccessMsg] = useState("");
+
+  const handleFormatPembahasan = async () => {
+    if (!currentPembahasan.trim()) return;
+    try {
+      setIsFormattingPembahasan(true);
+      setFormatSuccessMsg("");
+      const res = await fetch("/api/ai/format-pembahasan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pembahasan: currentPembahasan,
+          soal_text: payload.soal_text,
+          bentukSoal: question.bentukSoal,
+          kunci_jawaban: payload.kunci_jawaban,
+          opsi: payload.opsi,
+          pernyataan: payload.pernyataan,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Gagal merapikan pembahasan.");
+      }
+
+      if (question.paketId && question.nomorUrut) {
+        const saveRes = await fetch(`/api/packages/${question.paketId}/slots/${question.nomorUrut}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pembahasan: json.data.pembahasan,
+          }),
+        });
+        const saveJson = await saveRes.json();
+        if (!saveRes.ok || !saveJson.success) {
+          throw new Error(saveJson.error || "Gagal menyimpan pembahasan terformat.");
+        }
+      }
+
+      setCurrentPembahasan(json.data.pembahasan);
+      if (question.payload) {
+        question.payload.pembahasan = json.data.pembahasan;
+      }
+      setFormatSuccessMsg("Pembahasan berhasil dirapikan!");
+      setTimeout(() => setFormatSuccessMsg(""), 4000);
+    } catch (err: any) {
+      alert(err.message || "Gagal merapikan pembahasan.");
+    } finally {
+      setIsFormattingPembahasan(false);
+    }
+  };
+
   const handleAction = async (decision: "disetujui" | "ditolak" | "direvisi") => {
     setActionError("");
 
@@ -315,12 +368,34 @@ export function QuestionReviewModal({
 
           {/* RENDER AKHIR PEMBAHASAN (KaTeX) */}
           <div className="space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <Info className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Pembahasan & Kunci Konsep:</span>
-            </h4>
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs">
-              <LatexPreview isPembahasan content={payload.pembahasan || "_Tidak ada pembahasan._"} />
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Pembahasan & Kunci Konsep:</span>
+              </h4>
+              <button
+                type="button"
+                onClick={handleFormatPembahasan}
+                disabled={isFormattingPembahasan || !currentPembahasan.trim()}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
+                title="Rapikan format pembahasan dengan standar AyoTKA (AI)"
+              >
+                {isFormattingPembahasan ? (
+                  <Loader2 className="w-3.5 h-3.5 text-indigo-600 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                )}
+                <span>{isFormattingPembahasan ? "Merapikan..." : "Rapikan Pembahasan (AI)"}</span>
+              </button>
+            </div>
+            {formatSuccessMsg && (
+              <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-medium flex items-center gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>{formatSuccessMsg}</span>
+              </div>
+            )}
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-sans leading-relaxed">
+              <LatexPreview isPembahasan content={currentPembahasan || "_Tidak ada pembahasan._"} />
             </div>
           </div>
 

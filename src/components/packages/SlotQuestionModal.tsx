@@ -140,25 +140,22 @@ export function SlotQuestionModal({
       if (mode === "edit") {
         setPembahasan(json.data.pembahasan);
       } else if (q) {
-        // Mode view: simpan langsung pembaruan ke slot
-        const updatedPayload = { ...(q.payload || {}), pembahasan: json.data.pembahasan };
+        // Mode view: simpan langsung pembaruan ke slot via PATCH
         const saveRes = await fetch(`/api/packages/${packageData.id}/slots/${b.nomorUrut}`, {
-          method: "PUT",
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            payload: updatedPayload,
-            elemen: q.elemen,
-            subElemen: q.subElemen,
-            kompetensi: q.kompetensi,
-            levelKognitif: q.levelKognitif,
-            tingkatKesulitan: q.tingkatKesulitan,
-            bentukSoal: q.bentukSoal,
-            jenisSoal: q.jenisSoal,
-            stimulusId: q.stimulusId,
+            pembahasan: json.data.pembahasan,
           }),
         });
-        if (!saveRes.ok) throw new Error("Gagal menyimpan pembahasan terformat ke slot.");
+        const saveJson = await saveRes.json();
+        if (!saveRes.ok || !saveJson.success) {
+          throw new Error(saveJson.error || "Gagal menyimpan pembahasan terformat ke slot.");
+        }
         setPembahasan(json.data.pembahasan);
+        if (q.payload) {
+          q.payload.pembahasan = json.data.pembahasan;
+        }
         onSuccess();
       }
       setFormatSuccessMsg("Pembahasan berhasil dirapikan sesuai standar AyoTKA!");

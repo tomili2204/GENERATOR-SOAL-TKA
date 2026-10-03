@@ -231,3 +231,106 @@ export async function POST(
     );
   }
 }
+
+// PATCH /api/packages/[id]/slots/[slotNumber] - Update parsial pembahasan butir soal
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string; slotNumber: string } }
+) {
+  try {
+    const user = await getSessionUser();
+    if (!user) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!hasAnyRole(user, ["pembuat_soal", "admin", "validator_soal"])) {
+      return NextResponse.json(
+        { success: false, error: "Anda tidak memiliki izin mengedit butir soal ini." },
+        { status: 403 }
+      );
+    }
+
+    const packageId = params.id;
+    const slotNumber = parseInt(params.slotNumber, 10);
+
+    if (isNaN(slotNumber) || slotNumber < 1 || slotNumber > 30) {
+      return NextResponse.json(
+        { success: false, error: "Nomor slot tidak valid (1-30)." },
+        { status: 400 }
+      );
+    }
+
+    const pkgRecords = await db
+      .select()
+      .from(questionPackages)
+      .where(eq(questionPackages.id, packageId))
+      .limit(1);
+
+    if (pkgRecords.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "Paket soal tidak ditemukan." },
+        { status: 404 }
+      );
+    }
+
+    const pkg = pkgRecords[0];
+
+    // Cek hak akses terhadap paket (pembuat milik sendiri, validator, atau admin)
+    if (pkg.authorId !== user.id && !hasAnyRole(user, ["admin", "validator_soal"])) {
+      return NextResponse.json(
+        { success: false, error: "Anda tidak memiliki izin mengedit paket ini." },
+        { status: 403 }
+      );
+    }
+
+    const existingSlotQuestions = await db
+      .select()
+      .from(questions)
+      .where(and(eq(questions.paketId, pkg.id), eq(questions.nomorUrut, slotNumber)))
+      .limit(1);
+
+    if (existingSlotQuestions.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "Butir soal pada slot ini belum diisi." },
+        { status: 404 }
+      );
+    }
+
+    const q = existingSlotQuestions[0];
+    const body = await req.json();
+
+    if (body.pembahasan !== undefined) {
+      const currentPayload = (q.payload as Record<string, any>) || {};
+      const updatedPayload = { ...currentPayload, pembahasan: body.pembahasan };
+
+      await db
+        .update(questions)
+        .set({
+          payload: updatedPayload,
+          updatedAt: new Date(),
+        })
+        .where(eq(questions.id, q.id));
+
+      return NextResponse.json({
+        success: true,
+        message: "Pembahasan berhasil diperbarui.",
+        data: {
+          id: q.id,
+          pembahasan: body.pembahasan,
+        },
+      });
+    }
+
+    return NextResponse.json(
+      { success: false, error: "Tidak ada field data yang diperbarui." },
+      { status: 400 }
+    );
+  } catch (error: any) {
+    console.error("PATCH /api/packages/[id]/slots/[slotNumber] error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Gagal memperbarui pembahasan slot." },
+      { status: 500 }
+    );
+  }
+}
+
