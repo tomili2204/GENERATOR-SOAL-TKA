@@ -127,23 +127,24 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({
         );
 
         // (b) Rasionalkan baris baru agar narasi pembahasan tersusun rapi ke bawah
-        text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat)\s+(?=(?:Pernyataan\s+|Langkah\s+)?(?:\d+[\)\.\-]\s+|\(\d+\)\s+|\[\d+\]\s+))/gi, "$1\n\n");
-        text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|\d)\s+(?=(?:Opsi\s+|Pilihan\s+|Pernyataan\s+)?[A-E][\)\.\:\-]\s+|\([A-E]\)\s+|\[[A-E]\]\s+)/gi, "$1\n\n");
-        text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|___KATEX_INLINE_\d+___)\s+(?=(?:Langkah|Tahap|Kasus)\s+\d+[:\.\s]|Pernyataan\s+\d+[:\.\s](?!(?:adalah\s+)?(?:BENAR|SALAH|Benar|Salah)\b))/gi, "$1\n\n");
+        text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat)\s+(?=(?:Langkah\s+)?(?:\d+[\)\.\-]\s+|\(\d+\)\s+|\[\d+\]\s+))/gi, "$1\n\n");
+        text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|\d)\s+(?=(?:Opsi\s+|Pilihan\s+)?[A-E][\)\.\:\-]\s+|\([A-E]\)\s+|\[[A-E]\]\s+)/gi, "$1\n\n");
+        text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|___KATEX_INLINE_\d+___)\s+(?=(?:Langkah|Tahap|Kasus)\s+\d+[:\.\s])/gi, "$1\n\n");
         text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|___KATEX_INLINE_\d+___)\s+(?=(?:Diketahui|Ditanya|Dijawab|Penyelesaian|Rumus|Analisis|Simpulan|Kesimpulan)[:\s])/gi, "$1\n\n");
         text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)(\.|\))\s+(?=(?:Luas|Keliling|Volume|Panjang|Lebar|Tinggi|Jari-jari|Diameter)\s+[^.]+?=)/gi, "$1\n");
         text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat)\s+(?=(?:Jadi[:,\s]+(?:pernyataan|jawaban|opsi|pilihan|kunci)|Kesimpulan|Simpulan)[:\s])/gi, "$1\n\n");
         text = text.replace(/\s+(?=\((?:Koreksi|Catatan):)/gi, "\n");
 
-        // (c) Bersihkan penomoran ganda redundan (misal: "1. Opsi A:" -> "Opsi A:")
-        text = text.replace(/(^|\n+)\s*\d+[\.\)]\s*(?=(?:Opsi|Pilihan|Pernyataan)\s+[A-E0-9]+[:\.\)\-]|Opsi\s+\d+|Pilihan\s+\d+)/gi, "$1");
+        // (c) Bersihkan penomoran ganda khusus opsi pilihan ganda (misal: "1. Opsi A:" -> "Opsi A:")
+        // Jangan sertakan Pernyataan di sini agar "1. Pernyataan 1:" TIDAK terhapus angka 1-nya
+        text = text.replace(/(^|\n+)\s*\d+[\.\)]\s*(?=(?:Opsi|Pilihan)\s+[A-E0-9]+[:\.\)\-]|Opsi\s+\d+|Pilihan\s+\d+)/gi, "$1");
         text = text.replace(/(^|\n+)\s*\d+[\.\)]\s*(?=[A-E][\.\)][\s:])/g, "$1");
 
         // Format umum Pernyataan X: BENAR / SALAH yang berdiri sendiri
         text = text.replace(/Pernyataan\s+(\d+)[:\s]+(BENAR|SALAH)\.?/gi, (_m, num, verdict) => {
           const isBenar = /benar/i.test(verdict);
           const badge = isBenar ? badgeBenar : badgeSalah;
-          return `Pernyataan ${num}: ${badge}`;
+          return `<strong>Pernyataan ${num}:</strong> ${badge}`;
         });
 
         // (d) Beri badge visual modern untuk penanda validitas Benar dan Salah
@@ -154,6 +155,9 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({
         text = text.replace(/(?<![-a-zA-Z])(?<=\:|\-\>|\—|\–)\s*\b(Benar|Tepat|BENAR)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, ` ${badgeBenar}`);
         text = text.replace(/(?<![-a-zA-Z])(?<=\:|\-\>|\—|\–)\s*\b(Salah|Tidak Tepat|Keliru|SALAH)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, ` ${badgeSalah}`);
         text = text.replace(/(?<![-a-zA-Z])(?<=\.\s*)\b(Benar|Salah)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, (_m, word) => word.toLowerCase() === 'benar' ? ` ${badgeBenar}` : ` ${badgeSalah}`);
+
+        // Tebalkan kata "Pernyataan \d+:" agar terbaca jelas dan menyatu dalam alur kalimat
+        text = text.replace(/(?<!<strong>)\bPernyataan\s+(\d+)[:\.]?\s*/gi, "<strong>Pernyataan $1:</strong> ");
       }
 
       // Dukungan Markdown tebal (**teks**) dan miring (*teks*)
@@ -201,10 +205,8 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({
               processedLines.push(`<div class="flex items-start gap-2 ml-1 my-0.5"><span class="text-slate-400 select-none leading-relaxed">•</span><span class="flex-1">${bulletMatch ? bulletMatch[1] : line}</span></div>`);
             } else if (isPembahasan) {
               // Aturan khusus hanya untuk komponen PEMBAHASAN:
-              // Butir opsi jawaban / analisis pernyataan
-              // WAJIB ada pemisah tanda baca titik/kurung setelah huruf opsi (contoh: "A. " atau "Opsi A:")
-              // Tidak akan mencocokkan kata biasa seperti "Bulux" atau "Berdasarkan"
-              const optionMatch = line.match(/^(?:<strong>)?(?:(Opsi|Pilihan|Pernyataan)\s+([A-E0-9]+)[:\.\)\-]?|([A-E])[\.\)])(?:<\/strong>)?\s+(.*)$/i);
+              // Butir analisis opsi jawaban pilihan ganda (Opsi A, Opsi B, dll.)
+              const optionMatch = line.match(/^(?:<strong>)?(?:(Opsi|Pilihan)\s+([A-E0-9]+)[:\.\)\-]?|([A-E])[\.\)])(?:<\/strong>)?\s+(.*)$/i);
               if (optionMatch) {
                 const label = optionMatch[1] && optionMatch[2]
                   ? `${optionMatch[1]} ${optionMatch[2]}`
@@ -229,6 +231,14 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({
                     `<span class="font-bold text-slate-600 shrink-0 min-w-[1.25rem] text-right select-none pt-px">${num}.</span>` +
                     `<div class="flex-1 leading-relaxed min-w-0">${body}</div>` +
                   `</div>`
+                );
+                continue;
+              }
+
+              // Sub-pernyataan di bawah langkah bernomor (misal Pernyataan 2 di bawah langkah 2)
+              if (/^<strong>Pernyataan\s+\d+:<\/strong>/i.test(line)) {
+                processedLines.push(
+                  `<div class="my-1 pl-7 text-slate-700 leading-relaxed min-w-0">${line}</div>`
                 );
                 continue;
               }
