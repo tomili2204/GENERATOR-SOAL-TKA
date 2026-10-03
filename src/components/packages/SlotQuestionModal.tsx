@@ -26,6 +26,8 @@ import {
   Loader2,
   Info,
   Trash2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 interface SlotQuestionModalProps {
@@ -110,6 +112,7 @@ export function SlotQuestionModal({
   const [errorMessage, setErrorMessage] = useState("");
   const [isFormattingPembahasan, setIsFormattingPembahasan] = useState(false);
   const [formatSuccessMsg, setFormatSuccessMsg] = useState("");
+  const [isNoteExpanded, setIsNoteExpanded] = useState(true);
 
   const handleFormatPembahasan = async () => {
     const currentPembahasan = mode === "edit" ? pembahasan : q?.payload?.pembahasan;
@@ -402,13 +405,43 @@ export function SlotQuestionModal({
         </div>
 
         {/* Banner Alert jika Soal Ditolak atau Direvisi */}
+        {/* Banner Alert jika Soal Ditolak atau Direvisi */}
         {slot.isFilled && q?.status === "ditolak" && (
-          <div className="bg-rose-50 border-b border-rose-200 px-6 py-3 flex items-start gap-2.5 text-xs text-rose-900 shrink-0">
+          <div className="bg-rose-50 border-b border-rose-200 px-6 py-2.5 flex items-start gap-2.5 text-xs text-rose-900 shrink-0">
             <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-            <div className="space-y-1.5">
-              <span className="font-bold block">Slot ini DITOLAK oleh Validator:</span>
-              <ValidatorNoteText text={q.validationNotes || "Tidak memenuhi kriteria kelulusan naskah."} />
-              <p className="text-rose-700 font-medium">
+            <div className="space-y-1.5 flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold flex items-center gap-1.5 text-rose-950">
+                  <span>Slot ini DITOLAK oleh Validator</span>
+                  <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-rose-200/70 text-rose-800">
+                    Scrollable
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsNoteExpanded(!isNoteExpanded)}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-800 hover:text-rose-950 bg-rose-200/60 hover:bg-rose-200 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                >
+                  {isNoteExpanded ? (
+                    <>
+                      <span>Ciutkan Catatan</span>
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </>
+                  ) : (
+                    <>
+                      <span>Buka Catatan Penolakan</span>
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {isNoteExpanded && (
+                <div className="max-h-36 overflow-y-auto pr-2 rounded-lg bg-rose-100/70 p-3 border border-rose-200/90 text-rose-950 shadow-inner">
+                  <ValidatorNoteText text={q.validationNotes || "Tidak memenuhi kriteria kelulusan naskah."} />
+                </div>
+              )}
+              <p className="text-rose-700 font-medium text-[11.5px]">
                 👉 Silakan perbaiki atau unggah butir soal baru sebagai pengganti slot ini agar paket dapat lolos 30/30.
               </p>
             </div>
@@ -416,21 +449,79 @@ export function SlotQuestionModal({
         )}
 
         {slot.isFilled && (q?.status === "direvisi" || q?.status === "perlu_revisi") && (
-          <div className="bg-orange-50 border-b border-orange-200 px-6 py-3 flex items-start gap-2.5 text-xs text-orange-900 shrink-0">
+          <div className="bg-orange-50 border-b border-orange-200 px-6 py-2.5 flex items-start gap-2.5 text-xs text-orange-900 shrink-0">
             <AlertTriangle className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
-            <div className="space-y-1.5 flex-1">
-              <span className="font-bold block">Catatan Perbaikan Validator:</span>
-              <ValidatorNoteText text={q.validationNotes || "Perlu penyesuaian formula atau redaksi."} />
+            <div className="space-y-1.5 flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold flex items-center gap-1.5 text-orange-950">
+                  <span>Catatan Perbaikan Validator</span>
+                  <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-orange-200/70 text-orange-800">
+                    Scrollable
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsNoteExpanded(!isNoteExpanded)}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-800 hover:text-orange-950 bg-orange-200/60 hover:bg-orange-200 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                >
+                  {isNoteExpanded ? (
+                    <>
+                      <span>Ciutkan Catatan</span>
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </>
+                  ) : (
+                    <>
+                      <span>Buka Catatan Revisi</span>
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {isNoteExpanded && (
+                <div className="max-h-36 overflow-y-auto pr-2 rounded-lg bg-orange-100/70 p-3 border border-orange-200/90 text-orange-950 shadow-inner">
+                  <ValidatorNoteText text={q.validationNotes || "Perlu penyesuaian formula atau redaksi."} />
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {slot.isFilled && q?.status === "menunggu_validasi" && q?.previousValidationNotes && (
-          <div className="bg-sky-50 border-b border-sky-200 px-6 py-3 flex items-start gap-2.5 text-xs text-sky-900 shrink-0">
+          <div className="bg-sky-50 border-b border-sky-200 px-6 py-2.5 flex items-start gap-2.5 text-xs text-sky-900 shrink-0">
             <Info className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
-            <div className="space-y-1.5 flex-1">
-              <span className="font-bold block">Catatan Revisi Validator Sebelumnya (Tahap 1):</span>
-              <ValidatorNoteText text={q.previousValidationNotes} />
+            <div className="space-y-1.5 flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold flex items-center gap-1.5 text-sky-950">
+                  <span>Catatan Revisi Validator Sebelumnya (Tahap 1)</span>
+                  <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-sky-200/70 text-sky-800">
+                    Scrollable
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsNoteExpanded(!isNoteExpanded)}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-800 hover:text-sky-950 bg-sky-200/60 hover:bg-sky-200 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                >
+                  {isNoteExpanded ? (
+                    <>
+                      <span>Ciutkan Catatan</span>
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </>
+                  ) : (
+                    <>
+                      <span>Buka Catatan</span>
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {isNoteExpanded && (
+                <div className="max-h-36 overflow-y-auto pr-2 rounded-lg bg-sky-100/70 p-3 border border-sky-200/90 text-sky-950 shadow-inner">
+                  <ValidatorNoteText text={q.previousValidationNotes} />
+                </div>
+              )}
               <p className="text-[11px] text-sky-700">
                 Butir soal ini telah Anda perbaiki dan saat ini sedang menunggu telaah validasi ulang (Tahap 2) dari validator.
               </p>
