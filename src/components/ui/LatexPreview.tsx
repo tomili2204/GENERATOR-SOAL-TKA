@@ -7,6 +7,7 @@ import { repairLatexString } from "@/lib/latex/latex-repair";
 interface LatexPreviewProps {
   content: string;
   className?: string;
+  isPembahasan?: boolean;
 }
 
 /**
@@ -14,8 +15,13 @@ interface LatexPreviewProps {
  * - Blok matematika ($$ ... $$)
  * - Matematika inline ($ ... $)
  * - Tabel Markdown sederhana (| ... |)
+ * - Format khusus pembahasan dan solusi hanya aktif jika isPembahasan={true}
  */
-export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className = "" }) => {
+export const LatexPreview: React.FC<LatexPreviewProps> = ({
+  content,
+  className = "",
+  isPembahasan = false,
+}) => {
   const renderedHtml = useMemo(() => {
     if (!content) return "";
 
@@ -103,78 +109,56 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className =
       // 5. Kembalikan escaped dollar
       text = text.replace(/___ESCAPED_DOLLAR___/g, "$");
 
-      // 5a. Definisikan badge visual modern untuk penanda validitas Benar dan Salah
-      const badgeBenar = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300/80 align-middle select-none">✓ Benar</span>';
-      const badgeSalah = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11.5px] font-bold bg-rose-100 text-rose-800 border border-rose-300/80 align-middle select-none">✗ Salah</span>';
+      // Format khusus pembahasan dan solusi HANYA aktif jika isPembahasan={true}
+      // Teks soal, stimulus, dan opsi jawaban (op.text) TIDAK akan tersentuh oleh aturan penataan pembahasan!
+      if (isPembahasan) {
+        const badgeBenar = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300/80 align-middle select-none">✓ Benar</span>';
+        const badgeSalah = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11.5px] font-bold bg-rose-100 text-rose-800 border border-rose-300/80 align-middle select-none">✗ Salah</span>';
 
-      // 5b. Normalisasi butir nomor yang memuat evaluasi pernyataan di ujungnya
-      // Contoh: "1. Jangkauan ... (homogen). Pernyataan 1 BENAR."
-      // Diubah menjadi satu kesatuan rapi: "Pernyataan 1: Jangkauan ... (homogen). [✓ Benar]"
-      text = text.replace(/(^|\n+)\s*(\d+)[\.\)]\s*(.*?)(?:[\.\,\;]?\s*(?:maka|sehingga|berarti)?\s*Pernyataan\s+\2\s+(?:adalah\s+)?(BENAR|SALAH|Benar|Salah)\.?\s*)$/gim,
-        (_match, prefix, num, content, verdict) => {
+        // (a) Normalisasi butir nomor yang memuat evaluasi pernyataan di ujungnya
+        // Contoh: "1. Jangkauan ... (homogen). Pernyataan 1 BENAR."
+        // Diubah menjadi satu kesatuan rapi: "Pernyataan 1: Jangkauan ... (homogen). [✓ Benar]"
+        text = text.replace(/(^|\n+)\s*(\d+)[\.\)]\s*(.*?)(?:[\.\,\;]?\s*(?:maka|sehingga|berarti)?\s*Pernyataan\s+\2\s+(?:adalah\s+)?(BENAR|SALAH|Benar|Salah)\.?\s*)$/gim,
+          (_match, prefix, num, content, verdict) => {
+            const isBenar = /benar/i.test(verdict);
+            const badge = isBenar ? badgeBenar : badgeSalah;
+            return `${prefix}Pernyataan ${num}: ${content.trim()}. ${badge}`;
+          }
+        );
+
+        // (b) Rasionalkan baris baru agar narasi pembahasan tersusun rapi ke bawah
+        text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat)\s+(?=(?:Pernyataan\s+|Langkah\s+)?(?:\d+[\)\.\-]\s+|\(\d+\)\s+|\[\d+\]\s+))/gi, "$1\n\n");
+        text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|\d)\s+(?=(?:Opsi\s+|Pilihan\s+|Pernyataan\s+)?[A-E][\)\.\:\-]\s+|\([A-E]\)\s+|\[[A-E]\]\s+)/gi, "$1\n\n");
+        text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|___KATEX_INLINE_\d+___)\s+(?=(?:Langkah|Tahap|Kasus)\s+\d+[:\.\s]|Pernyataan\s+\d+[:\.\s](?!(?:adalah\s+)?(?:BENAR|SALAH|Benar|Salah)\b))/gi, "$1\n\n");
+        text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|___KATEX_INLINE_\d+___)\s+(?=(?:Diketahui|Ditanya|Dijawab|Penyelesaian|Rumus|Analisis|Simpulan|Kesimpulan)[:\s])/gi, "$1\n\n");
+        text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)(\.|\))\s+(?=(?:Luas|Keliling|Volume|Panjang|Lebar|Tinggi|Jari-jari|Diameter)\s+[^.]+?=)/gi, "$1\n");
+        text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat)\s+(?=(?:Jadi[:,\s]+(?:pernyataan|jawaban|opsi|pilihan|kunci)|Kesimpulan|Simpulan)[:\s])/gi, "$1\n\n");
+        text = text.replace(/\s+(?=\((?:Koreksi|Catatan):)/gi, "\n");
+
+        // (c) Bersihkan penomoran ganda redundan (misal: "1. Opsi A:" -> "Opsi A:")
+        text = text.replace(/(^|\n+)\s*\d+[\.\)]\s*(?=(?:Opsi|Pilihan|Pernyataan)\s+[A-E0-9]+[:\.\)\-]|Opsi\s+\d+|Pilihan\s+\d+)/gi, "$1");
+        text = text.replace(/(^|\n+)\s*\d+[\.\)]\s*(?=[A-E][\.\)][\s:])/g, "$1");
+
+        // Format umum Pernyataan X: BENAR / SALAH yang berdiri sendiri
+        text = text.replace(/Pernyataan\s+(\d+)[:\s]+(BENAR|SALAH)\.?/gi, (_m, num, verdict) => {
           const isBenar = /benar/i.test(verdict);
           const badge = isBenar ? badgeBenar : badgeSalah;
-          return `${prefix}Pernyataan ${num}: ${content.trim()}. ${badge}`;
-        }
-      );
+          return `Pernyataan ${num}: ${badge}`;
+        });
 
-      // 6. Rasionalkan baris baru agar simbol dan narasi penjelasan tersusun rapi ke bawah
-      // (a) Pecah baris sebelum penomoran butir: 1) ..., 2) ... atau 1. ..., 2. ... atau (1) ...
-      text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat)\s+(?=(?:Pernyataan\s+|Langkah\s+)?(?:\d+[\)\.\-]\s+|\(\d+\)\s+|\[\d+\]\s+))/gi, "$1\n\n");
+        // (d) Beri badge visual modern untuk penanda validitas Benar dan Salah
+        text = text.replace(/[\(\[](?:Benar|Tepat|BENAR)[\)\]]/g, badgeBenar);
+        text = text.replace(/[\(\[](?:Salah|Tidak Tepat|Keliru|SALAH)[\)\]]/g, badgeSalah);
+        text = text.replace(/(?<![-a-zA-Z])(?<=\.|\))\s*\b(BENAR)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, ` ${badgeBenar}`);
+        text = text.replace(/(?<![-a-zA-Z])(?<=\.|\))\s*\b(SALAH)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, ` ${badgeSalah}`);
+        text = text.replace(/(?<![-a-zA-Z])(?<=\:|\-\>|\—|\–)\s*\b(Benar|Tepat|BENAR)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, ` ${badgeBenar}`);
+        text = text.replace(/(?<![-a-zA-Z])(?<=\:|\-\>|\—|\–)\s*\b(Salah|Tidak Tepat|Keliru|SALAH)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, ` ${badgeSalah}`);
+        text = text.replace(/(?<![-a-zA-Z])(?<=\.\s*)\b(Benar|Salah)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, (_m, word) => word.toLowerCase() === 'benar' ? ` ${badgeBenar}` : ` ${badgeSalah}`);
+      }
 
-      // (b) Pecah baris sebelum label opsi: A), B), C), D) / A., B. / A: / (A) / [A] / Opsi A / Pilihan A
-      text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|\d)\s+(?=(?:Opsi\s+|Pilihan\s+|Pernyataan\s+)?[A-E][\)\.\:\-]\s+|\([A-E]\)\s+|\[[A-E]\]\s+)/gi, "$1\n\n");
-
-      // (c) Pecah baris sebelum tahapan/langkah: Langkah 1:, Pernyataan 1:, Tahap 1:, Kasus 1:
-      // Perhatian: Jangan pecah jika Pernyataan \d+ diikuti kata BENAR/SALAH (karena itu evaluasi akhir, bukan awal langkah)
-      text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|___KATEX_INLINE_\d+___)\s+(?=(?:Langkah|Tahap|Kasus)\s+\d+[:\.\s]|Pernyataan\s+\d+[:\.\s](?!(?:adalah\s+)?(?:BENAR|SALAH|Benar|Salah)\b))/gi, "$1\n\n");
-
-      // (d) Pecah baris sebelum kata kunci struktur: Diketahui, Ditanya, Jawab, Penyelesaian, Rumus, Simpulan
-      text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat|___KATEX_INLINE_\d+___)\s+(?=(?:Diketahui|Ditanya|Dijawab|Penyelesaian|Rumus|Analisis|Simpulan|Kesimpulan)[:\s])/gi, "$1\n\n");
-
-      // (e) Pecah baris sebelum perhitungan matematis utama (asalkan bukan label opsi seperti A. atau 1.)
-      text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)(\.|\))\s+(?=(?:Luas|Keliling|Volume|Panjang|Lebar|Tinggi|Jari-jari|Diameter)\s+[^.]+?=)/gi, "$1\n");
-
-      // (f) Pecah baris sebelum penarikan kesimpulan akhir (misal: "Jadi, pernyataan...", "Jadi: Pernyataan...", "Kesimpulan:")
-      text = text.replace(/(?<!\b[A-Ea-e]\b|\b\d{1,2}\b)([\.\)\;\!\?]|benar|salah|tepat)\s+(?=(?:Jadi[:,\s]+(?:pernyataan|jawaban|opsi|pilihan|kunci)|Kesimpulan|Simpulan)[:\s])/gi, "$1\n\n");
-
-      // (g) Pecah baris sebelum catatan dalam kurung: (Koreksi: ...), (Catatan: ...)
-      text = text.replace(/\s+(?=\((?:Koreksi|Catatan):)/gi, "\n");
-
-      // (h) Bersihkan penomoran ganda redundan (misal: "1. Opsi A:" -> "Opsi A:", "1. A. " -> "A. ")
-      text = text.replace(/(^|\n+)\s*\d+[\.\)]\s*(?=(?:Opsi|Pilihan|Pernyataan)\s+[A-E0-9]+[:\.\)\-]|Opsi\s+\d+|Pilihan\s+\d+)/gi, "$1");
-      text = text.replace(/(^|\n+)\s*\d+[\.\)]\s*(?=[A-E][\.\)][\s:])/g, "$1");
-
-      // (i) Dukungan Markdown tebal (**teks**) dan miring (*teks*)
+      // Dukungan Markdown tebal (**teks**) dan miring (*teks*)
       text = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
       text = text.replace(/\*(.*?)\*/g, "<em>$1</em>");
-
-      // Format umum Pernyataan X: BENAR / SALAH yang berdiri sendiri
-      text = text.replace(/Pernyataan\s+(\d+)[:\s]+(BENAR|SALAH)\.?/gi, (_m, num, verdict) => {
-        const isBenar = /benar/i.test(verdict);
-        const badge = isBenar ? badgeBenar : badgeSalah;
-        return `Pernyataan ${num}: ${badge}`;
-      });
-
-      // (j) Beri badge visual modern untuk penanda validitas Benar dan Salah
-      // 1. Dalam tanda kurung / siku: (Benar), [Benar], (Tepat), (Salah), [Salah], dsb.
-      text = text.replace(/[\(\[](?:Benar|Tepat|BENAR)[\)\]]/g, badgeBenar);
-      text = text.replace(/[\(\[](?:Salah|Tidak Tepat|Keliru|SALAH)[\)\]]/g, badgeSalah);
-
-      // 2. Evaluasi eksplisit di akhir kalimat / baris (misal: "... 72,5%. BENAR." atau "... koin. SALAH.")
-      // Perhatian: Wajib menggunakan (?<![-a-zA-Z]) dan (?!-) agar kata ulang seperti "BENAR-BENAR" TIDAK terpicu!
-      text = text.replace(/(?<![-a-zA-Z])(?<=\.|\))\s*\b(BENAR)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, ` ${badgeBenar}`);
-      text = text.replace(/(?<![-a-zA-Z])(?<=\.|\))\s*\b(SALAH)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, ` ${badgeSalah}`);
-
-      // 3. Evaluasi setelah tanda titik dua / panah / strip panjang di akhir baris (misal: "Pernyataan 1: BENAR", "-> Salah")
-      text = text.replace(/(?<![-a-zA-Z])(?<=\:|\-\>|\—|\–)\s*\b(Benar|Tepat|BENAR)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, ` ${badgeBenar}`);
-      text = text.replace(/(?<![-a-zA-Z])(?<=\:|\-\>|\—|\–)\s*\b(Salah|Tidak Tepat|Keliru|SALAH)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, ` ${badgeSalah}`);
-
-      // 4. Evaluasi title-case di akhir kalimat (misal: "... sudah sesuai. Benar.")
-      text = text.replace(/(?<![-a-zA-Z])(?<=\.\s*)\b(Benar|Salah)\b\.?(?!\-)(?=\s*(?:$|\n|<))/g, (_m, word) => word.toLowerCase() === 'benar' ? ` ${badgeBenar}` : ` ${badgeSalah}`);
-
-      // (k) Tebalkan label opsi di awal baris agar mudah dibedakan (misal: A), B) atau 1), 2))
-      text = text.replace(/(^|\n+)((?:Opsi\s+|Pilihan\s+|Pernyataan\s+)?[A-E][\)\.\:\-]\s*|\([A-E]\)\s*|\[[A-E]\]\s*)/gi, "$1<strong>$2</strong>");
 
       // 7. Parse Markdown Tables sederhana jika ada baris bertanda pipe (|)
       const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
@@ -215,9 +199,12 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className =
             } else if (/^[-*•]\s+(.*)$/.test(line)) {
               const bulletMatch = line.match(/^[-*•]\s+(.*)$/);
               processedLines.push(`<div class="flex items-start gap-2 ml-1 my-0.5"><span class="text-slate-400 select-none leading-relaxed">•</span><span class="flex-1">${bulletMatch ? bulletMatch[1] : line}</span></div>`);
-            } else {
+            } else if (isPembahasan) {
+              // Aturan khusus hanya untuk komponen PEMBAHASAN:
               // Butir opsi jawaban / analisis pernyataan
-              const optionMatch = line.match(/^(?:<strong>)?(?:(Opsi|Pilihan|Pernyataan)\s+([A-E0-9]+)|([A-E]))(?:<\/strong>)?[:\.\)\-]?\s*(?:<\/strong>)?[:\s]*(.*)$/i);
+              // WAJIB ada pemisah tanda baca titik/kurung setelah huruf opsi (contoh: "A. " atau "Opsi A:")
+              // Tidak akan mencocokkan kata biasa seperti "Bulux" atau "Berdasarkan"
+              const optionMatch = line.match(/^(?:<strong>)?(?:(Opsi|Pilihan|Pernyataan)\s+([A-E0-9]+)[:\.\)\-]?|([A-E])[\.\)])(?:<\/strong>)?\s+(.*)$/i);
               if (optionMatch) {
                 const label = optionMatch[1] && optionMatch[2]
                   ? `${optionMatch[1]} ${optionMatch[2]}`
@@ -260,6 +247,10 @@ export const LatexPreview: React.FC<LatexPreviewProps> = ({ content, className =
                 continue;
               }
 
+              processedLines.push(line);
+            } else {
+              // Jika BUKAN pembahasan (soal, opsi, stimulus):
+              // Tampilkan baris biasa secara murni tanpa penataan butir
               processedLines.push(line);
             }
           }

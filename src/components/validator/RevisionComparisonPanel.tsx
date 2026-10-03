@@ -202,8 +202,8 @@ export function RevisionComparisonPanel({
       <ComparisonRow
         label="Pembahasan"
         hasChange={pembahasanChanged}
-        before={<LatexPreview content={previous.pembahasan || "–"} />}
-        after={<LatexPreview content={current.pembahasan || "–"} />}
+        before={<LatexPreview isPembahasan content={previous.pembahasan || "–"} />}
+        after={<LatexPreview isPembahasan content={current.pembahasan || "–"} />}
       />
     </div>
   );

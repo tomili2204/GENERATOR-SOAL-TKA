@@ -320,7 +320,7 @@ export function QuestionReviewModal({
               <span>Pembahasan & Kunci Konsep:</span>
             </h4>
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs">
-              <LatexPreview content={payload.pembahasan || "_Tidak ada pembahasan._"} />
+              <LatexPreview isPembahasan content={payload.pembahasan || "_Tidak ada pembahasan._"} />
             </div>
           </div>
 

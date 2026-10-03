@@ -706,7 +706,7 @@ export function AdminAllSoalTableView({
                     Pembahasan Lengkap & Solusi Prosedural
                   </span>
                   <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-5">
-                    <LatexPreview content={selectedQuestion.payload?.pembahasan || "_Belum ada pembahasan._"} />
+                    <LatexPreview isPembahasan content={selectedQuestion.payload?.pembahasan || "_Belum ada pembahasan._"} />
                   </div>
                 </div>
               )}

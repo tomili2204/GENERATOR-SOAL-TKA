@@ -1084,7 +1084,7 @@ export function ManualQuestionForm() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
               Pratinjau Pembahasan:
             </span>
-            <LatexPreview content={pembahasan || "_Belum ada teks pembahasan._"} />
+            <LatexPreview isPembahasan content={pembahasan || "_Belum ada teks pembahasan._"} />
           </div>
         </div>
       </div>

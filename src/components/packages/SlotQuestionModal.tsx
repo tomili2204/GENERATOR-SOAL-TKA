@@ -534,7 +534,7 @@ export function SlotQuestionModal({
                   Pembahasan & Solusi
                 </label>
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs font-sans leading-relaxed text-slate-800">
-                  <LatexPreview content={q.payload?.pembahasan || "Belum ada pembahasan."} />
+                  <LatexPreview isPembahasan content={q.payload?.pembahasan || "Belum ada pembahasan."} />
                 </div>
               </div>
             </div>
