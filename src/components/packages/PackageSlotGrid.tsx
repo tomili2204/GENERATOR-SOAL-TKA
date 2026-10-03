@@ -3,7 +3,7 @@
 import React from "react";
 import { STATUS_CONFIGS } from "@/lib/tokens";
 import { QuestionStatusType, BentukSoalType, TingkatKesulitanType } from "@/db/schema";
-import { Plus, CheckCircle2, Clock, AlertTriangle, XCircle, Eye, Edit3, RefreshCw } from "lucide-react";
+import { Plus, CheckCircle2, Clock, AlertTriangle, XCircle, Eye, Edit3, RefreshCw, RotateCcw } from "lucide-react";
 
 export interface SlotData {
   nomorUrut: number;
@@ -40,14 +40,34 @@ export function PackageSlotGrid({ slots, onSelectSlot, isValidator = false }: Pa
             Kosong
           </span>
         );
+        let isRevalidation = false;
 
         if (isFilled) {
+          isRevalidation =
+            q.status === "menunggu_validasi" &&
+            Boolean(
+              (q.previousValidationNotes && q.previousValidationNotes.trim().length > 0) ||
+              q.previousPayload ||
+              (q.validationNotes && q.validationNotes.trim().length > 0)
+            );
+
           if (q.status === "disetujui") {
             borderClass = "border-emerald-200 bg-emerald-50/20 hover:border-emerald-400";
             badge = (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-800">
                 <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
                 <span>Disetujui</span>
+              </span>
+            );
+          } else if (isRevalidation) {
+            borderClass = "border-indigo-300 bg-indigo-50/30 hover:border-indigo-500 ring-2 ring-indigo-200/80 shadow-xs";
+            badge = (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 shadow-2xs"
+                title="Soal telah diperbaiki oleh admin dan memerlukan telaah / validasi tahap ke-2"
+              >
+                <RotateCcw className="w-2.5 h-2.5 text-indigo-600" />
+                <span>Validasi Ke-2</span>
               </span>
             );
           } else if (q.status === "menunggu_validasi") {
@@ -86,9 +106,23 @@ export function PackageSlotGrid({ slots, onSelectSlot, isValidator = false }: Pa
             <div>
               {/* Header Slot: Nomor & Status */}
               <div className="flex items-center justify-between mb-2">
-                <span className="w-7 h-7 rounded-lg bg-slate-900 text-white font-mono font-bold text-xs flex items-center justify-center shrink-0">
-                  {slot.nomorUrut.toString().padStart(2, "0")}
-                </span>
+                <div className="relative">
+                  <span
+                    className={`w-7 h-7 rounded-lg text-white font-mono font-bold text-xs flex items-center justify-center shrink-0 transition-colors ${
+                      isRevalidation
+                        ? "bg-indigo-950 ring-2 ring-indigo-400/80"
+                        : "bg-slate-900"
+                    }`}
+                  >
+                    {slot.nomorUrut.toString().padStart(2, "0")}
+                  </span>
+                  {isRevalidation && (
+                    <span
+                      className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-500 rounded-full border-2 border-white"
+                      title="Butir soal pasca-revisi admin (butuh validasi ke-2)"
+                    />
+                  )}
+                </div>
                 {badge}
               </div>
 
@@ -115,6 +149,14 @@ export function PackageSlotGrid({ slots, onSelectSlot, isValidator = false }: Pa
                 </p>
               </div>
 
+              {/* Micro-banner penanda pasca-revisi */}
+              {isRevalidation && (
+                <div className="flex items-center gap-1.5 text-[10px] font-semibold text-indigo-800 bg-indigo-100/80 border border-indigo-200 rounded px-1.5 py-0.5 mb-1.5">
+                  <RotateCcw className="w-2.5 h-2.5 text-indigo-600 shrink-0" />
+                  <span className="truncate">Pasca-Revisi Admin • Butuh Telaah Ke-2</span>
+                </div>
+              )}
+
               {/* Cuplikan Teks Soal jika sudah terisi */}
               {isFilled ? (
                 <p className="text-xs text-slate-700 line-clamp-2 bg-slate-50 p-1.5 rounded border border-slate-100 mb-2 font-sans text-[11px]">
@@ -139,6 +181,11 @@ export function PackageSlotGrid({ slots, onSelectSlot, isValidator = false }: Pa
                   <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600">
                     <Edit3 className="w-3 h-3" />
                     <span>Perbaiki</span>
+                  </span>
+                ) : isRevalidation ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 hover:text-indigo-900">
+                    <RotateCcw className="w-3 h-3 text-indigo-600" />
+                    <span>{isValidator ? "Telaah Ke-2" : "Lihat Revisi"}</span>
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-[11px] text-slate-600 hover:text-slate-900">

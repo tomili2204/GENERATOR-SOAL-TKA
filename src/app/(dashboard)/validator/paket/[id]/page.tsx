@@ -19,6 +19,7 @@ import {
   UserCheck,
   Zap,
   Loader2,
+  RotateCcw,
 } from "lucide-react";
 
 export default function ValidatorPaketDetailPage() {
@@ -243,24 +244,47 @@ export default function ValidatorPaketDetailPage() {
         </div>
 
         {/* Progress Tracker */}
-        <div className="pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-          <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 flex items-center justify-between">
-            <span className="text-emerald-800 font-medium">Disetujui</span>
-            <span className="text-lg font-bold font-mono text-emerald-700">{progress?.disetujuiCount || 0}</span>
-          </div>
-          <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 flex items-center justify-between">
-            <span className="text-amber-800 font-medium">Menunggu Telaah</span>
-            <span className="text-lg font-bold font-mono text-amber-700">{progress?.menungguCount || 0}</span>
-          </div>
-          <div className="p-3 rounded-xl bg-orange-50/70 border border-orange-200 flex items-center justify-between">
-            <span className="text-orange-800 font-medium">Perlu Revisi</span>
-            <span className="text-lg font-bold font-mono text-orange-700">{progress?.direvisiCount || 0}</span>
-          </div>
-          <div className="p-3 rounded-xl bg-rose-50/70 border border-rose-200 flex items-center justify-between">
-            <span className="text-rose-800 font-medium">Ditolak</span>
-            <span className="text-lg font-bold font-mono text-rose-700">{progress?.ditolakCount || 0}</span>
-          </div>
-        </div>
+        {(() => {
+          const revalidasiCount = slots.filter(
+            (s) =>
+              s.isFilled &&
+              s.question?.status === "menunggu_validasi" &&
+              Boolean(
+                (s.question?.previousValidationNotes && s.question?.previousValidationNotes.trim().length > 0) ||
+                s.question?.previousPayload ||
+                (s.question?.validationNotes && s.question?.validationNotes.trim().length > 0)
+              )
+          ).length;
+
+          return (
+            <div className="pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+              <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 flex items-center justify-between">
+                <span className="text-emerald-800 font-medium">Disetujui</span>
+                <span className="text-lg font-bold font-mono text-emerald-700">{progress?.disetujuiCount || 0}</span>
+              </div>
+              <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 flex items-center justify-between">
+                <div>
+                  <span className="text-amber-800 font-medium block">Menunggu Telaah</span>
+                  {revalidasiCount > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-100 border border-indigo-200/80 px-1.5 py-0.5 rounded-full mt-0.5 shadow-2xs">
+                      <RotateCcw className="w-2.5 h-2.5 text-indigo-600" />
+                      <span>{revalidasiCount} Validasi Ke-2</span>
+                    </span>
+                  )}
+                </div>
+                <span className="text-lg font-bold font-mono text-amber-700">{progress?.menungguCount || 0}</span>
+              </div>
+              <div className="p-3 rounded-xl bg-orange-50/70 border border-orange-200 flex items-center justify-between">
+                <span className="text-orange-800 font-medium">Perlu Revisi</span>
+                <span className="text-lg font-bold font-mono text-orange-700">{progress?.direvisiCount || 0}</span>
+              </div>
+              <div className="p-3 rounded-xl bg-rose-50/70 border border-rose-200 flex items-center justify-between">
+                <span className="text-rose-800 font-medium">Ditolak</span>
+                <span className="text-lg font-bold font-mono text-rose-700">{progress?.ditolakCount || 0}</span>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Grid 30 Slot */}

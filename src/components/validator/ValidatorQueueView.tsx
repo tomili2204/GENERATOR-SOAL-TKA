@@ -14,6 +14,7 @@ import {
   Sparkles,
   Eye,
   Check,
+  RotateCcw,
 } from "lucide-react";
 import { QuestionReviewModal } from "./QuestionReviewModal";
 import { TablePagination } from "@/components/ui/TablePagination";
@@ -278,12 +279,34 @@ export function ValidatorQueueView({
               <tbody className="divide-y divide-slate-100 bg-white">
                 {paginatedItems.map((item) => {
                   const isSelf = item.authorId === currentUserId;
+                  const isRevalidation =
+                    item.status === "menunggu_validasi" &&
+                    Boolean(
+                      (item.previousValidationNotes && item.previousValidationNotes.trim().length > 0) ||
+                      item.previousPayload ||
+                      (item.validationNotes && item.validationNotes.trim().length > 0)
+                    );
 
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                    <tr
+                      key={item.id}
+                      className={`transition-colors ${
+                        isRevalidation
+                          ? "bg-indigo-50/25 hover:bg-indigo-50/40"
+                          : "hover:bg-slate-50/70"
+                      }`}
+                    >
                       {/* Kode & Bentuk */}
                       <td className="px-4 py-3">
-                        <div className="font-bold text-slate-900">{item.code}</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-slate-900">{item.code}</span>
+                          {isRevalidation && (
+                            <span className="inline-flex items-center gap-0.5 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-300 shadow-2xs">
+                              <RotateCcw className="w-2.5 h-2.5 text-indigo-600" />
+                              <span>Validasi Ke-2</span>
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
                             {item.bentukSoal || "PG"}
@@ -343,10 +366,18 @@ export function ValidatorQueueView({
                           <button
                             type="button"
                             onClick={() => setInspectingQuestion(item)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors shadow-2xs"
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors shadow-2xs ${
+                              isRevalidation
+                                ? "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700"
+                                : "text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200"
+                            }`}
                           >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>Telaah & Render</span>
+                            {isRevalidation ? (
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            ) : (
+                              <Eye className="w-3.5 h-3.5" />
+                            )}
+                            <span>{isRevalidation ? "Telaah Ke-2" : "Telaah & Render"}</span>
                           </button>
                         </div>
                       </td>

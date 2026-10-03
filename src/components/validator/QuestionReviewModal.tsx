@@ -15,6 +15,7 @@ import {
   FileText,
   Loader2,
   ExternalLink,
+  RotateCcw,
 } from "lucide-react";
 import { LatexPreview } from "@/components/ui/LatexPreview";
 import { GambarIllustration } from "@/components/ui/GambarIllustration";
@@ -41,6 +42,13 @@ export function QuestionReviewModal({
 
   const isSelf = question.authorId === currentUserId;
   const payload = question.payload || {};
+  const isRevalidation =
+    question.status === "menunggu_validasi" &&
+    Boolean(
+      (question.previousValidationNotes && question.previousValidationNotes.trim().length > 0) ||
+      question.previousPayload ||
+      (question.validationNotes && question.validationNotes.trim().length > 0)
+    );
 
   const [isFormattingPembahasan, setIsFormattingPembahasan] = useState(false);
   const [currentPembahasan, setCurrentPembahasan] = useState(payload.pembahasan || "");
@@ -134,6 +142,12 @@ export function QuestionReviewModal({
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 font-semibold">
                   {question.bentukSoal || "PG"}
                 </span>
+                {isRevalidation && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-300 shadow-2xs">
+                    <RotateCcw className="w-2.5 h-2.5 text-indigo-600" />
+                    <span>Validasi Ke-2 (Pasca-Revisi)</span>
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 {question.jenjang} · {question.mapel} · Elemen: <strong>{question.elemen}</strong>
@@ -152,6 +166,24 @@ export function QuestionReviewModal({
 
         {/* Isi Review (Scrollable) */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1 text-slate-800">
+          {/* Banner Penanda Validasi Ke-2 (Pasca Revisi Admin) */}
+          {isRevalidation && (
+            <div className="p-3.5 bg-indigo-50/80 border border-indigo-200 rounded-xl text-xs text-indigo-900 flex items-start gap-2.5 shadow-2xs">
+              <RotateCcw className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+              <div className="space-y-1 flex-1 min-w-0">
+                <strong className="font-bold text-indigo-950 flex items-center gap-2">
+                  <span>Permintaan Validasi Ke-2 (Tahap 2)</span>
+                  <span className="text-[10px] font-semibold px-2 py-0.2 rounded-full bg-indigo-200/80 text-indigo-800">
+                    Pasca-Revisi Admin
+                  </span>
+                </strong>
+                <p className="text-[11.5px] text-indigo-800 leading-relaxed">
+                  Butir soal ini telah diperbaiki oleh admin berdasarkan catatan telaah tahap pertama. Silakan periksa perubahan naskah pada panel di bawah dan berikan keputusan validasi akhir Anda.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Banner Pemisahan Tugas Jika Soal Sendiri */}
           {isSelf && (
             <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-start gap-3">

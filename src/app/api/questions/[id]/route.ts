@@ -127,6 +127,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
         stimulusId: body.jenis_soal === "grup" ? body.stimulus_id : null,
         status: "menunggu_validasi", // Otomatis diajukan ulang ke antrean telaah
         payload,
+        previousPayload: existingQuestion.status === "direvisi" ? existingQuestion.payload : (existingQuestion.previousPayload || null),
+        previousValidationNotes: existingQuestion.status === "direvisi" ? (existingQuestion.validationNotes || existingQuestion.previousValidationNotes) : (existingQuestion.previousValidationNotes || null),
+        validationNotes: null,
+        validatorId: null,
         temaKonteks: body.tema_konteks !== undefined ? (body.tema_konteks?.trim() || null) : existingQuestion.temaKonteks,
         updatedAt: new Date(),
       })
