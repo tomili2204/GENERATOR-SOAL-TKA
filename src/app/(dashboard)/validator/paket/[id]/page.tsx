@@ -17,6 +17,8 @@ import {
   Layers,
   Sparkles,
   UserCheck,
+  Zap,
+  Loader2,
 } from "lucide-react";
 
 export default function ValidatorPaketDetailPage() {
@@ -31,6 +33,7 @@ export default function ValidatorPaketDetailPage() {
 
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isBypassing, setIsBypassing] = useState(false);
 
   // Review Modal State
   const [selectedQuestion, setSelectedQuestion] = useState<any | null>(null);
@@ -58,6 +61,31 @@ export default function ValidatorPaketDetailPage() {
       setError(err.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleBypassValidation = async () => {
+    const confirmed = window.confirm(
+      `⚡ BYPASS VALIDASI (SUPER ADMIN)\n\nApakah Anda yakin ingin membypass validasi untuk paket ini?\n\nEfek tindakan:\n1. Seluruh butir soal dalam paket otomatis berstatus DISETUJUI.\n2. Paket berpindah ke status "Siap Rilis" (30/30 lolos) dan dapat langsung diterbitkan.\n3. Validator tetap berhak meninjau atau merevisi butir soal jika ditemukan koreksi nanti.\n\nLanjutkan?`
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsBypassing(true);
+      const res = await fetch(`/api/admin/packages/${packageId}/bypass-validation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Gagal membypass validasi paket.");
+      }
+      alert(json.message);
+      loadPackageDetails();
+    } catch (err: any) {
+      alert(err.message || "Gagal membypass validasi paket.");
+    } finally {
+      setIsBypassing(false);
     }
   };
 
@@ -185,14 +213,32 @@ export default function ValidatorPaketDetailPage() {
             </p>
           </div>
 
-          <div className="text-right">
-            <span className="text-xs font-semibold text-slate-500 block font-mono">Status Kelulusan Naskah:</span>
-            <span className="text-2xl font-bold font-mono text-slate-900">
-              {progress?.disetujuiCount || 0} / 30 Butir
-            </span>
-            <span className="text-xs text-emerald-600 font-bold block">
-              ({progress?.percentageApproved || 0}% Lolos)
-            </span>
+          <div className="flex flex-col sm:flex-row items-end gap-3">
+            {isAdmin && packageData.status !== "diterbitkan" && packageData.status !== "siap_rilis" && (
+              <button
+                onClick={handleBypassValidation}
+                disabled={isBypassing}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 transition-all shadow-2xs hover:shadow-xs cursor-pointer disabled:opacity-50"
+                title="Bypass Validasi (Super Admin): Setujui semua butir soal dan pindahkan ke Siap Rilis"
+              >
+                {isBypassing ? (
+                  <Loader2 className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                ) : (
+                  <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
+                )}
+                <span>{isBypassing ? "Memproses..." : "⚡ Bypass Validasi"}</span>
+              </button>
+            )}
+
+            <div className="text-right">
+              <span className="text-xs font-semibold text-slate-500 block font-mono">Status Kelulusan Naskah:</span>
+              <span className="text-2xl font-bold font-mono text-slate-900">
+                {progress?.disetujuiCount || 0} / 30 Butir
+              </span>
+              <span className="text-xs text-emerald-600 font-bold block">
+                ({progress?.percentageApproved || 0}% Lolos)
+              </span>
+            </div>
           </div>
         </div>
 

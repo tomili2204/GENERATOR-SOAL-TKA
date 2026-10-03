@@ -16,6 +16,8 @@ import {
   Send,
   X,
   Rocket,
+  Zap,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { isJenjangMatch } from "@/lib/jenjang-utils";
@@ -116,6 +118,33 @@ export function PackageAssignmentView({ initialPackages }: PackageAssignmentView
       alert(err.message || "Gagal menerbitkan paket");
     } finally {
       setIsPublishing(null);
+    }
+  };
+
+  const [isBypassing, setIsBypassing] = useState<string | null>(null);
+
+  const handleBypassValidation = async (pkg: PackageAdminItem) => {
+    const confirmed = window.confirm(
+      `⚡ BYPASS VALIDASI (SUPER ADMIN)\n\nApakah Anda yakin ingin membypass validasi untuk paket "${pkg.code} - ${pkg.nama}"?\n\nEfek tindakan:\n1. Seluruh butir soal dalam paket otomatis berstatus DISETUJUI.\n2. Paket berpindah ke status "Siap Rilis" dan siap diterbitkan.\n3. Validator tetap berhak meninjau atau merevisi butir soal jika ditemukan koreksi nanti.\n\nLanjutkan?`
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsBypassing(pkg.id);
+      const res = await fetch(`/api/admin/packages/${pkg.id}/bypass-validation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Gagal membypass validasi paket.");
+      }
+      setPublishSuccessMsg(data.message || `Paket ${pkg.code} berhasil dibypass dan kini Siap Rilis!`);
+      refreshPackages();
+    } catch (err: any) {
+      alert(err.message || "Gagal membypass validasi paket.");
+    } finally {
+      setIsBypassing(null);
     }
   };
 
@@ -633,6 +662,22 @@ export function PackageAssignmentView({ initialPackages }: PackageAssignmentView
                             <UserPlus className="w-3.5 h-3.5" />
                             <span>{isAssigned ? "Ubah Validator" : "Tugaskan"}</span>
                           </button>
+
+                          {pkg.status !== "diterbitkan" && pkg.status !== "siap_rilis" && (
+                            <button
+                              onClick={() => handleBypassValidation(pkg)}
+                              disabled={isBypassing === pkg.id}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer shrink-0 disabled:opacity-50"
+                              title="Bypass Validasi (Super Admin): Setujui semua butir soal dan pindahkan ke Siap Rilis"
+                            >
+                              {isBypassing === pkg.id ? (
+                                <Loader2 className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                              ) : (
+                                <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
+                              )}
+                              <span>{isBypassing === pkg.id ? "Memproses..." : "⚡ Bypass Validasi"}</span>
+                            </button>
+                          )}
 
                           {pkg.status === "siap_rilis" ? (
                             <button

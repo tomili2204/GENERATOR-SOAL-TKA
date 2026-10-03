@@ -19,6 +19,8 @@ import {
   Sparkles,
   Info,
   FileSpreadsheet,
+  Zap,
+  Loader2,
 } from "lucide-react";
 
 export default function PembuatPaketDetailPage() {
@@ -35,6 +37,10 @@ export default function PembuatPaketDetailPage() {
   const [selectedSlot, setSelectedSlot] = useState<SlotData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isBypassing, setIsBypassing] = useState(false);
+  const [isBeautifyingAll, setIsBeautifyingAll] = useState(false);
 
   // Publish State
   const [isPublishing, setIsPublishing] = useState(false);
@@ -54,10 +60,61 @@ export default function PembuatPaketDetailPage() {
       setPackageData(json.data.package);
       setSlots(json.data.slots);
       setProgress(json.data.progress);
+      setIsAdmin(!!json.data.isAdmin);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleBypassValidation = async () => {
+    const confirmed = window.confirm(
+      `⚡ BYPASS VALIDASI (SUPER ADMIN)\n\nApakah Anda yakin ingin membypass validasi untuk paket ini?\n\nEfek tindakan:\n1. Seluruh butir soal dalam paket otomatis berstatus DISETUJUI.\n2. Paket berpindah ke status "Siap Rilis" (30/30 lolos) dan dapat langsung diterbitkan.\n3. Validator tetap berhak meninjau atau merevisi butir soal jika ditemukan koreksi nanti.\n\nLanjutkan?`
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsBypassing(true);
+      const res = await fetch(`/api/admin/packages/${packageId}/bypass-validation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Gagal membypass validasi paket.");
+      }
+      setPublishMessage(json.message);
+      loadPackageDetails();
+    } catch (err: any) {
+      alert(err.message || "Gagal membypass validasi paket.");
+    } finally {
+      setIsBypassing(false);
+    }
+  };
+
+  const handleBeautifyAll = async () => {
+    const confirmed = window.confirm(
+      `✨ RAPIKAN SEMUA PEMBAHASAN (AI)\n\nSistem akan menstandarkan format seluruh pembahasan soal pada paket ini secara otomatis sesuai standar AyoTKA.\n\nLanjutkan?`
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsBeautifyingAll(true);
+      const res = await fetch(`/api/packages/${packageId}/beautify-pembahasan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Gagal merapikan pembahasan paket.");
+      }
+      alert(json.message);
+      loadPackageDetails();
+    } catch (err: any) {
+      alert(err.message || "Gagal merapikan pembahasan paket.");
+    } finally {
+      setIsBeautifyingAll(false);
     }
   };
 
@@ -170,30 +227,49 @@ export default function PembuatPaketDetailPage() {
           </div>
 
           {/* Tombol Terbitkan Paket */}
-          <div className="flex flex-col items-end gap-1.5">
-            {packageData.status === "diterbitkan" ? (
-              <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-sm">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Paket Telah Diterbitkan (Tayang ke Siswa)</span>
-              </div>
-            ) : progress?.canPublish ? (
-              <button
-                onClick={handlePublish}
-                disabled={isPublishing}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-md hover:shadow-lg cursor-pointer transform active:scale-95"
-              >
-                <Send className="w-4 h-4" />
-                <span>{isPublishing ? "Memproses..." : "🚀 Terbitkan Paket (Siap Tayang)"}</span>
-              </button>
-            ) : (
-              <button
-                disabled
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Terbitkan Paket (Siap Tayang)</span>
-              </button>
-            )}
+          {/* Tombol Terbitkan Paket & Bypass Validasi */}
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+              {isAdmin && packageData.status !== "diterbitkan" && packageData.status !== "siap_rilis" && (
+                <button
+                  onClick={handleBypassValidation}
+                  disabled={isBypassing}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 transition-all shadow-2xs hover:shadow-xs cursor-pointer disabled:opacity-50"
+                  title="Bypass Validasi (Super Admin): Setujui semua butir soal dan pindahkan ke Siap Rilis"
+                >
+                  {isBypassing ? (
+                    <Loader2 className="w-4 h-4 text-amber-600 animate-spin" />
+                  ) : (
+                    <Zap className="w-4 h-4 text-amber-600 fill-amber-500" />
+                  )}
+                  <span>{isBypassing ? "Memproses..." : "⚡ Bypass Validasi"}</span>
+                </button>
+              )}
+
+              {packageData.status === "diterbitkan" ? (
+                <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-sm">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Paket Telah Diterbitkan (Tayang ke Siswa)</span>
+                </div>
+              ) : progress?.canPublish ? (
+                <button
+                  onClick={handlePublish}
+                  disabled={isPublishing}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-md hover:shadow-lg cursor-pointer transform active:scale-95"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>{isPublishing ? "Memproses..." : "🚀 Terbitkan Paket (Siap Tayang)"}</span>
+                </button>
+              ) : (
+                <button
+                  disabled
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Terbitkan Paket (Siap Tayang)</span>
+                </button>
+              )}
+            </div>
 
             {!progress?.canPublish && packageData.status !== "diterbitkan" && (
               <span className="text-[11px] text-slate-400 font-mono">
@@ -248,8 +324,21 @@ export default function PembuatPaketDetailPage() {
               Klik pada salah satu slot untuk melihat atau mengisi naskah soal.
             </span>
             <button
+              onClick={handleBeautifyAll}
+              disabled={isBeautifyingAll || (progress?.filledSlotsCount || 0) === 0}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors shrink-0 disabled:opacity-50 cursor-pointer shadow-2xs"
+              title="Rapikan format seluruh pembahasan butir soal pada paket ini dengan standar AyoTKA (AI)"
+            >
+              {isBeautifyingAll ? (
+                <Loader2 className="w-3.5 h-3.5 text-indigo-600 animate-spin" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+              )}
+              <span>{isBeautifyingAll ? "Merapikan..." : "✨ Rapikan Pembahasan Paket (AI)"}</span>
+            </button>
+            <button
               onClick={() => setIsImportOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shrink-0"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shrink-0 cursor-pointer"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
               <span>Impor dari Excel</span>

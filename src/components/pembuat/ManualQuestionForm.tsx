@@ -16,6 +16,7 @@ import {
   Info,
   ArrowRight,
   ShieldCheck,
+  Loader2,
 } from "lucide-react";
 import { LatexPreview } from "@/components/ui/LatexPreview";
 import { SvgIllustration } from "@/components/ui/SvgIllustration";
@@ -87,6 +88,42 @@ export function ManualQuestionForm() {
   const [initialLoading, setInitialLoading] = useState<boolean>(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [successData, setSuccessData] = useState<any>(null);
+  const [isFormattingPembahasan, setIsFormattingPembahasan] = useState<boolean>(false);
+  const [formatSuccessMsg, setFormatSuccessMsg] = useState<string>("");
+
+  const handleFormatPembahasan = async () => {
+    if (!pembahasan || !pembahasan.trim()) {
+      alert("Silakan ketik teks pembahasan terlebih dahulu sebelum dirapikan.");
+      return;
+    }
+    try {
+      setIsFormattingPembahasan(true);
+      setFormatSuccessMsg("");
+      const res = await fetch("/api/ai/format-pembahasan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pembahasan,
+          soal_text: soalText,
+          bentukSoal,
+          kunci_jawaban: bentukSoal === "PGK_KATEGORI" ? kunciKategori : kunciJawabanList,
+          opsi: opsiList,
+          pernyataan: pernyataanList,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Gagal merapikan pembahasan.");
+      }
+      setPembahasan(json.data.pembahasan);
+      setFormatSuccessMsg("Pembahasan berhasil dirapikan sesuai standar AyoTKA!");
+      setTimeout(() => setFormatSuccessMsg(""), 4000);
+    } catch (err: any) {
+      alert(err.message || "Gagal merapikan pembahasan.");
+    } finally {
+      setIsFormattingPembahasan(false);
+    }
+  };
 
   // Nilai Tetap / Taksonomi Dinamis (dari Admin)
   const [availableMapels, setAvailableMapels] = useState<string[]>(["Matematika", "Bahasa Indonesia"]);
@@ -1057,17 +1094,40 @@ export function ManualQuestionForm() {
 
       {/* Bagian 5: Pembahasan Soal & KaTeX Preview */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-3">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-100 gap-2">
           <div className="flex items-center gap-2">
             <Info className="w-4 h-4 text-indigo-600" />
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
               5. Pembahasan Lengkap & KaTeX
             </h3>
           </div>
-          <span className="text-[11px] font-mono text-slate-400">
-            Mendukung rumus LaTeX & Markdown
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleFormatPembahasan}
+              disabled={isFormattingPembahasan || !pembahasan.trim()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
+              title="Rapikan struktur langkah & kesimpulan pembahasan secara otomatis dengan standar AyoTKA"
+            >
+              {isFormattingPembahasan ? (
+                <Loader2 className="w-3.5 h-3.5 text-indigo-600 animate-spin" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+              )}
+              <span>{isFormattingPembahasan ? "Merapikan..." : "Rapikan Pembahasan (AI)"}</span>
+            </button>
+            <span className="text-[11px] font-mono text-slate-400 hidden sm:inline">
+              Mendukung rumus LaTeX & Markdown
+            </span>
+          </div>
         </div>
+
+        {formatSuccessMsg && (
+          <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-medium flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{formatSuccessMsg}</span>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div>

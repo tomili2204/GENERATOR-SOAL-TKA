@@ -21,7 +21,7 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   menunggu_validasi: ["disetujui", "ditolak", "direvisi", "perlu_revisi"],
   direvisi: ["menunggu_validasi", "direvisi", "perlu_revisi", "disetujui", "ditolak"],
   perlu_revisi: ["menunggu_validasi", "direvisi", "perlu_revisi", "disetujui", "ditolak"],
-  disetujui: ["direvisi", "perlu_revisi"], // Jika setelah disetujui ternyata ditemukan kesalahan teknis dan ditarik untuk revisi
+  disetujui: ["direvisi", "perlu_revisi", "ditolak", "disetujui"], // Memungkinkan validator menarik untuk revisi, menolak, atau memperbarui catatan telaah
   ditolak: ["menunggu_validasi", "direvisi", "perlu_revisi", "ditolak", "disetujui"],
 };
 

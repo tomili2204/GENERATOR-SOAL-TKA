@@ -108,6 +108,67 @@ export function SlotQuestionModal({
   // Status & Pesan
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isFormattingPembahasan, setIsFormattingPembahasan] = useState(false);
+  const [formatSuccessMsg, setFormatSuccessMsg] = useState("");
+
+  const handleFormatPembahasan = async () => {
+    const currentPembahasan = mode === "edit" ? pembahasan : q?.payload?.pembahasan;
+    if (!currentPembahasan || !currentPembahasan.trim()) {
+      alert("Belum ada teks pembahasan untuk dirapikan.");
+      return;
+    }
+    try {
+      setIsFormattingPembahasan(true);
+      setFormatSuccessMsg("");
+      const res = await fetch("/api/ai/format-pembahasan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pembahasan: currentPembahasan,
+          soal_text: soalText || q?.payload?.soal_text,
+          bentukSoal: bentukSoal || q?.bentukSoal,
+          kunci_jawaban: kunciJawaban || q?.payload?.kunci_jawaban,
+          opsi: opsi || q?.payload?.opsi,
+          pernyataan: pernyataan || q?.payload?.pernyataan,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Gagal merapikan pembahasan.");
+      }
+
+      if (mode === "edit") {
+        setPembahasan(json.data.pembahasan);
+      } else if (q) {
+        // Mode view: simpan langsung pembaruan ke slot
+        const updatedPayload = { ...(q.payload || {}), pembahasan: json.data.pembahasan };
+        const saveRes = await fetch(`/api/packages/${packageData.id}/slots/${b.nomorUrut}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            payload: updatedPayload,
+            elemen: q.elemen,
+            subElemen: q.subElemen,
+            kompetensi: q.kompetensi,
+            levelKognitif: q.levelKognitif,
+            tingkatKesulitan: q.tingkatKesulitan,
+            bentukSoal: q.bentukSoal,
+            jenisSoal: q.jenisSoal,
+            stimulusId: q.stimulusId,
+          }),
+        });
+        if (!saveRes.ok) throw new Error("Gagal menyimpan pembahasan terformat ke slot.");
+        setPembahasan(json.data.pembahasan);
+        onSuccess();
+      }
+      setFormatSuccessMsg("Pembahasan berhasil dirapikan sesuai standar AyoTKA!");
+      setTimeout(() => setFormatSuccessMsg(""), 4000);
+    } catch (err: any) {
+      alert(err.message || "Gagal merapikan pembahasan.");
+    } finally {
+      setIsFormattingPembahasan(false);
+    }
+  };
 
   // Sinkronisasi saat slot berganti
   useEffect(() => {
@@ -530,9 +591,31 @@ export function SlotQuestionModal({
 
               {/* Pembahasan */}
               <div>
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5 font-mono">
-                  Pembahasan & Solusi
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block font-mono">
+                    Pembahasan & Solusi
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleFormatPembahasan}
+                    disabled={isFormattingPembahasan || !q.payload?.pembahasan?.trim()}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
+                    title="Rapikan format pembahasan dengan standar AyoTKA"
+                  >
+                    {isFormattingPembahasan ? (
+                      <Loader2 className="w-3.5 h-3.5 text-indigo-600 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                    )}
+                    <span>{isFormattingPembahasan ? "Merapikan..." : "Rapikan Pembahasan (AI)"}</span>
+                  </button>
+                </div>
+                {formatSuccessMsg && (
+                  <div className="mb-2 p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-medium flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{formatSuccessMsg}</span>
+                  </div>
+                )}
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs font-sans leading-relaxed text-slate-800">
                   <LatexPreview isPembahasan content={q.payload?.pembahasan || "Belum ada pembahasan."} />
                 </div>
@@ -741,9 +824,31 @@ export function SlotQuestionModal({
 
               {/* Pembahasan */}
               <div>
-                <label className="font-semibold text-slate-900 block mb-1.5 text-xs">
-                  Pembahasan / Solusi <span className="text-rose-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-semibold text-slate-900 block text-xs">
+                    Pembahasan / Solusi <span className="text-rose-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleFormatPembahasan}
+                    disabled={isFormattingPembahasan || !pembahasan.trim()}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
+                    title="Rapikan format pembahasan dengan standar AyoTKA"
+                  >
+                    {isFormattingPembahasan ? (
+                      <Loader2 className="w-3.5 h-3.5 text-indigo-600 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                    )}
+                    <span>{isFormattingPembahasan ? "Merapikan..." : "Rapikan Pembahasan (AI)"}</span>
+                  </button>
+                </div>
+                {formatSuccessMsg && (
+                  <div className="mb-2 p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-medium flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{formatSuccessMsg}</span>
+                  </div>
+                )}
                 <textarea
                   rows={3}
                   value={pembahasan}
