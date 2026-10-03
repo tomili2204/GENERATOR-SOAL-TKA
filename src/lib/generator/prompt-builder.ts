@@ -134,13 +134,16 @@ const RUMUS_DAN_PEMBAHASAN = `PENULISAN RUMUS DAN PEMBAHASAN:
   Contoh salah: $Total $= 140 + 180 = 320$ kg$
 - Perhitungan panjang boleh ditulis pada baris tersendiri sebagai $$...$$ tanpa teks lain di baris itu.
 - Di dalam JSON tulis backslash LaTeX ganda: \\\\frac{3}{4}, \\\\times, \\\\sqrt{2}. Bilangan desimal ditulis dengan koma (2,5).
+- URUTAN LOGIKA BERPIKIR (REASONING-FIRST):
+  Selesaikan masalah matematika secara tuntas di dalam field "pembahasan" TERLEBIH DAHULU: hitung seluruh langkah angka secara pasti, temukan jawaban yang benar dan nilai opsi yang salah. Setelah hasil matematis pasti didapat, baru tetapkan "kunci_jawaban" dan susun "opsi" (jawaban benar dan distraktor) agar 100% konsisten tanpa kontradiksi.
 - Pembahasan ditulis per langkah, satu langkah per baris (di dalam JSON dipisah \\n), dan diakhiri kesimpulan yang menyebut kunci jawaban. Tulis seperti guru menulis kunci pembahasan.
-- DILARANG KERAS menyertakan proses berpikir/monolog internal AI atau evaluasi instruksi prompt (seperti "karena aturan PGK tidak boleh semua benar", "mari kita ubah opsi", "agar opsi D bernilai salah", "sebagai AI", dsb) ke dalam "pembahasan". Pembahasan HANYA berisi penjelasan konsep, penjabaran langkah hitungan untuk siswa, dan simpulan jawaban.`;
+- DILARANG KERAS menyertakan proses berpikir/monolog internal AI atau evaluasi instruksi prompt (seperti "karena aturan PGK tidak boleh semua benar", "mari kita ubah opsi", "mari beri opsi benar", "mari gunakan angka lain", "agar opsi D bernilai salah", "agar pas bulat", "mungkin salah ketik", "sebagai AI", dsb) ke dalam "pembahasan". Pembahasan HANYA berisi penjelasan konsep, penjabaran langkah hitungan untuk siswa, dan simpulan jawaban.
+- DILARANG KERAS memunculkan huruf opsi bayangan di dalam "pembahasan" yang tidak terdapat pada daftar opsi (misalnya menyebut Opsi E atau Pernyataan E padahal opsi hanya sampai D).`;
 
 const FORMAT_KELUARAN = `FORMAT KELUARAN — WAJIB, TIDAK BOLEH DILANGGAR:
 Kembalikan HANYA array JSON valid, tanpa teks lain di luar JSON dan tanpa markdown code fence.
 Di dalam teks (soal_text, pembahasan, stimulus, opsi) jangan memakai tanda petik ganda lurus (\\") untuk dialog atau kutipan; pakai petik tunggal ('...') atau petik lengkung (“...”) agar JSON tidak rusak.
-Setiap objek soal memiliki field persis berikut:
+Setiap objek soal memiliki field persis berikut (perhatikan urutan: selesaikan "pembahasan" terlebih dahulu sebelum menulis kunci dan opsi):
 {
   "jenjang": string, "mapel": string, "elemen": string, "sub_elemen": string,
   "kompetensi": string, "level_kognitif": string, "tingkat_kesulitan": "rendah"|"sedang"|"tinggi",
@@ -149,11 +152,11 @@ Setiap objek soal memiliki field persis berikut:
   "tema_konteks": string (2-5 kata ringkasan situasi soal),
   "soal_text": string,
   "gambar": null | {"tipe": "svg", ...} | {"tipe": "diagram", ...},
+  "pembahasan": string,
+  "kunci_jawaban": [string],
   "opsi": [{"label": string, "text": string}] | null,
   "pernyataan": [{"no": number, "text": string}] | null,
-  "kategori_respons": [string] | null,
-  "kunci_jawaban": [string],
-  "pembahasan": string
+  "kategori_respons": [string] | null
 }
 Untuk soal grup, beri stimulus_id_sementara yang sama pada semua butir dalam grup (mis. "stim-1"), dan letakkan objek stimulus terpisah di awal array: {"stimulus_id_sementara": string, "tipe": "teks"|"data", "konten": string}. Objek stimulus dibedakan dari objek soal karena tidak memiliki field "bentuk_soal".`;
 

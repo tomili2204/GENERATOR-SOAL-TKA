@@ -138,13 +138,17 @@ export function validateQuestionData(data: Partial<ValidateQuestionInput>): Vali
     }
   }
 
-  // 9. Validasi Pembahasan & LaTeX
+  // 9. Validasi Pembahasan, LaTeX, Anti-Monolog & Konsistensi Kunci
   if (!data.pembahasan || data.pembahasan.trim() === "") {
     errors.push("Pembahasan soal wajib diisi.");
   } else {
     const latexCheck = validateLatexDelimiters(data.pembahasan, "Pembahasan");
     if (!latexCheck.valid && latexCheck.error) {
       errors.push(latexCheck.error);
+    }
+    const qualityIssues = validatePembahasanQuality(data.pembahasan, data.opsi, data.kunci_jawaban);
+    if (qualityIssues.length > 0) {
+      errors.push(...qualityIssues);
     }
   }
 
@@ -248,3 +252,69 @@ export function validateQuestionData(data: Partial<ValidateQuestionInput>): Vali
     errors,
   };
 }
+
+/**
+ * Validasi Kualitas Pembahasan: Anti-Monolog/Kebocoran AI, Anti-Opsi Bayangan, & Konsistensi Kunci
+ */
+export function validatePembahasanQuality(
+  pembahasan?: string | null,
+  opsi?: Array<{ label: string; text: string }> | null,
+  kunciJawaban?: string[] | null
+): string[] {
+  const issues: string[] = [];
+  if (!pembahasan || typeof pembahasan !== "string" || !pembahasan.trim()) {
+    return issues;
+  }
+
+  // 1. Kebocoran monolog internal / meta-reasoning AI
+  const LEAK_PATTERNS = [
+    /\bmari\s+(?:kita\s+)?(gunakan\s+angka|perbaiki|beri|ubah|ganti|sesuaikan\s+angka|koreksi\s+kunci|revisi)\b/i,
+    /\b(?:tunggu,\s*mari|cek\s+angka,?\s*mungkin\s+salah\s+ketik|re-checking\s+calculation|agar\s+pas\s+bulat|agar\s+bilangan\s+bulat|ulangi\s+perhitungan|opsi\s+yang\s+tersedia\s+harus|salah\s+ketik\s+soal|kunci\s+jawaban\s+tertulis\s+salah|kunci\s+jawaban\s+disesuaikan\s+dengan\s+simulasi|simulasi\s+terakhir|analisis\s+baru\s*\(|hitungan\s+ulang\s*:)\b/i,
+    /aturan\s+PGK/i,
+    /tidak\s+boleh\s+semua\s+opsi\s+benar/i,
+    /mari\s+(kita\s+)?(ubah|ganti)\s+(teks\s+)?opsi/i,
+    /agar\s+opsi\s+[A-D]\s+(bernilai\s+)?salah/i,
+    /teks\s+opsi\s+[A-D]\s+diubah/i,
+    /pada\s+teks\s+opsi\s+[A-D]\s+di\s+atas\s+tertulis/i,
+    /sebagai\s+AI/i,
+    /saya\s+adalah\s+model\s+AI/i,
+    /sesuai\s+instruksi\s+prompt/i,
+    /cacat\s+desain\s+soal/i,
+  ];
+
+  for (const pattern of LEAK_PATTERNS) {
+    if (pattern.test(pembahasan)) {
+      issues.push(
+        "Pembahasan memuat kebocoran monolog internal / meta-reasoning AI (proses koreksi prompt/opsi bocor ke pembahasan siswa)."
+      );
+      break;
+    }
+  }
+
+  // 2. Opsi bayangan / halusinasi (misal menyebut Opsi E padahal pilihan hanya A-D)
+  if (Array.isArray(opsi) && opsi.length <= 4) {
+    const phantomOptionPattern = /(?:^|\n|\.)\s*(?:opsi|pilihan|pernyataan)\s+[E-Z]\b/i;
+    const phantomLetterColon = /(?:^|\n)\s*[E-Z]\s*:\s*(?:[A-Z]|Pekerja|Upah|Nilai|Benar|Salah)/i;
+    if (phantomOptionPattern.test(pembahasan) || phantomLetterColon.test(pembahasan)) {
+      issues.push(
+        "Pembahasan memuat opsi bayangan/halusinasi di luar pilihan jawaban yang tersedia (misal menyebut Opsi E padahal opsi hanya A-D)."
+      );
+    }
+  }
+
+  // 3. Kontradiksi langsung antara kunci_jawaban dengan pembahasan
+  if (Array.isArray(kunciJawaban)) {
+    for (const k of kunciJawaban) {
+      const strictSalah = new RegExp(`(?:^|\\n|\\.)\\s*${k}\\s*:[^\\n]{0,60}\\bSalah\\b`, "i");
+      if (strictSalah.test(pembahasan)) {
+        issues.push(
+          `Kunci jawaban [${k}] dicentang sistem, namun pada pembahasan dihitung secara tegas bernilai "(Salah)" (kontradiksi internal).`
+        );
+        break;
+      }
+    }
+  }
+
+  return issues;
+}
+

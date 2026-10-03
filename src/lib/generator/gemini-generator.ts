@@ -33,6 +33,7 @@ import {
   evaluateBatchSimilarity,
   checkQuestionSimilarity,
 } from "./similarity-checker";
+import { validatePembahasanQuality } from "@/lib/validations/question";
 
 
 export interface StoredAiConfig {
@@ -564,10 +565,13 @@ ATURAN WAJIB:
 1. Perbaiki HANYA sesuai catatan validator yang diberikan. Jangan mengubah bentuk soal, jenis soal, atau taksonomi elemen/kompetensi kecuali validator secara eksplisit memintanya.
 2. Jika catatan meminta redaksi ulang pertanyaan, opsi, atau pembahasan, tulis ulang secara utuh dan konsisten — jangan setengah-setengah atau menyisakan bagian lama yang kontradiktif dengan bagian baru.
 3. Jika catatan menyebutkan hasil perhitungan tidak bulat/tidak rapi, PILIH SALAH SATU: sesuaikan angka pada soal, ATAU ubah redaksi pertanyaan (misalnya menjadi "tambahan/kekurangan minimal") agar tetap valid secara matematis dan kunci jawabannya benar-benar cocok dengan salah satu opsi yang ada (jangan menghasilkan kunci yang tidak ada di daftar opsi).
-4. Field "pembahasan" WAJIB diuraikan bertingkat ke bawah per baris memakai karakter newline (\\n) untuk tiap langkah (contoh: "Diketahui: ...\\nLangkah 1: ...\\nLangkah 2: ...\\nSimpulan: ..."), jelas dan langsung ke inti. DILARANG memakai gaya bahasa yang terasa seperti keluaran AI generik (hindari frasa seperti "Tentu, berikut adalah...", "Sebagai AI...", "Baik, saya akan...", dsb) serta DILARANG KERAS menyertakan proses berpikir/monolog internal (seperti "mari kita ubah opsi agar bernilai salah", "karena aturan PGK", dsb) — tulis murni sebagaimana pendidik manusia menulis kunci pembahasan untuk siswa.
-5. Notasi matematika memakai LaTeX; di dalam JSON, escape backslash ganda (\\\\frac, \\\\times, \\\\sqrt, dst). Satu persamaan utuh berada di dalam SATU pasangan $...$, sedangkan kata penjelas dan satuan ditulis di luar tanda $ (contoh benar: Total = $140 + 180 = 320$ kg; contoh salah: $Total $= 140 + 180 = 320$ kg$). Perhitungan panjang boleh ditulis pada baris sendiri sebagai $$...$$.
-6. Field "gambar": jika catatan validator meminta ganti soal/tema total, atau jika soal baru tidak lagi berhubungan dengan gambar lama, WAJIB buat ilustrasi SVG baru yang sesuai dengan topik baru atau kembalikan "gambar": null (DILARANG mempertahankan gambar lama yang tidak relevan). Jika catatan validator TIDAK menyinggung ilustrasi dan topik soal tetap sama, kembalikan "gambar": null (sistem akan mempertahankan ilustrasi asli). Jika catatan validator secara eksplisit meminta perbaikan visual, sertakan revisi "gambar" mengikuti salah satu format: {"tipe": "svg", "svg_content": "<svg viewBox=\\"0 0 480 300\\" width=\\"100%\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>", "deskripsi_alt": "..."} untuk geometri/denah bebas, atau {"tipe": "diagram", "archetype": "diagram_batang"|"diagram_lingkaran"|"model_pecahan"|"garis_bilangan", "data": {...}, "deskripsi_alt": "..."} untuk diagram data/pecahan/garis bilangan (parameter data mengikuti skema masing-masing archetype).
-7. PADA SOAL BENTUK PGK_MCMA (Pilihan Ganda Kompleks Multi-Jawaban):
+4. URUTAN LOGIKA BERPIKIR (REASONING-FIRST):
+   Selesaikan masalah secara tuntas di dalam field "pembahasan" TERLEBIH DAHULU: hitung seluruh langkah angka secara pasti, temukan jawaban yang benar dan nilai opsi yang salah. Setelah hasil matematis pasti didapat, baru tetapkan "kunci_jawaban" dan susun "opsi" (jawaban benar dan distraktor) agar 100% konsisten tanpa kontradiksi.
+5. Field "pembahasan" WAJIB diuraikan bertingkat ke bawah per baris memakai karakter newline (\\n) untuk tiap langkah (contoh: "Diketahui: ...\\nLangkah 1: ...\\nLangkah 2: ...\\nSimpulan: ..."), jelas dan langsung ke inti. DILARANG memakai gaya bahasa yang terasa seperti keluaran AI generik (hindari frasa seperti "Tentu, berikut adalah...", "Sebagai AI...", "Baik, saya akan...", dsb) serta DILARANG KERAS menyertakan proses berpikir/monolog internal (seperti "mari kita ubah opsi", "mari beri opsi benar", "mari gunakan angka lain", "karena aturan PGK", "agar pas bulat", "mungkin salah ketik", dsb) — tulis murni sebagaimana pendidik manusia menulis kunci pembahasan untuk siswa.
+6. DILARANG KERAS memunculkan opsi bayangan/halusinasi di dalam "pembahasan" yang tidak terdapat pada pilihan jawaban (misalnya menyebut Opsi E atau Pernyataan E padahal pilihan hanya sampai D).
+7. Notasi matematika memakai LaTeX; di dalam JSON, escape backslash ganda (\\\\frac, \\\\times, \\\\sqrt, dst). Satu persamaan utuh berada di dalam SATU pasangan $...$, sedangkan kata penjelas dan satuan ditulis di luar tanda $ (contoh benar: Total = $140 + 180 = 320$ kg; contoh salah: $Total $= 140 + 180 = 320$ kg$). Perhitungan panjang boleh ditulis pada baris sendiri sebagai $$...$$.
+8. Field "gambar": jika catatan validator meminta ganti soal/tema total, atau jika soal baru tidak lagi berhubungan dengan gambar lama, WAJIB buat ilustrasi SVG baru yang sesuai dengan topik baru atau kembalikan "gambar": null (DILARANG mempertahankan gambar lama yang tidak relevan). Jika catatan validator TIDAK menyinggung ilustrasi dan topik soal tetap sama, kembalikan "gambar": null (sistem akan mempertahankan ilustrasi asli). Jika catatan validator secara eksplisit meminta perbaikan visual, sertakan revisi "gambar" mengikuti salah satu format: {"tipe": "svg", "svg_content": "<svg viewBox=\\"0 0 480 300\\" width=\\"100%\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>", "deskripsi_alt": "..."} untuk geometri/denah bebas, atau {"tipe": "diagram", "archetype": "diagram_batang"|"diagram_lingkaran"|"model_pecahan"|"garis_bilangan", "data": {...}, "deskripsi_alt": "..."} untuk diagram data/pecahan/garis bilangan (parameter data mengikuti skema masing-masing archetype).
+9. PADA SOAL BENTUK PGK_MCMA (Pilihan Ganda Kompleks Multi-Jawaban):
    - DILARANG membuat semua opsi bernilai benar (semua opsi benar adalah cacat desain soal asesmen).
    - Jika validator menyarankan agar "tidak semua jawaban benar" atau meminta agar "ada jawaban yang bernilai salah", JANGAN SELALU membuat pola malas yang hanya menyalahkan tepat 1 opsi (3 benar, 1 salah).
    - VARIASIKAN jumlah opsi yang benar secara proporsional dan mendidik:
@@ -575,14 +579,14 @@ ATURAN WAJIB:
      * Kombinasi 1 OPSI BENAR (dan 3 opsi salah) — sangat baik untuk mengecoh miskonsepsi umum.
      * Kombinasi 3 OPSI BENAR (dan 1 opsi salah).
    - Buatlah opsi pengecoh (distraktor salah) dengan kekeliruan konsep, rumus, atau hitungan yang masuk akal bagi siswa, lalu sesuaikan "kunci_jawaban" dan "pembahasan" secara konsisten.
-8. Kembalikan HANYA array JSON valid berisi TEPAT SATU objek, tanpa markdown code fence dan tanpa teks penjelasan apa pun di luar JSON, dengan skema PERSIS:
+10. Kembalikan HANYA array JSON valid berisi TEPAT SATU objek, tanpa markdown code fence dan tanpa teks penjelasan apa pun di luar JSON, dengan skema PERSIS (selesaikan "pembahasan" terlebih dahulu sebelum menulis kunci dan opsi):
 [{
   "soal_text": string,
+  "pembahasan": string,
+  "kunci_jawaban": [string],
   "opsi": [{"label": string, "text": string}] | null,
   "pernyataan": [{"no": number, "text": string}] | null,
   "kategori_respons": [string] | null,
-  "kunci_jawaban": [string],
-  "pembahasan": string,
   "gambar": null | {"tipe": "svg", "svg_content": string, "deskripsi_alt": string} | {"tipe": "diagram", "archetype": string, "data": object, "deskripsi_alt": string}
 }]`;
 
@@ -690,6 +694,14 @@ Kembalikan array JSON berisi TEPAT SATU objek hasil revisi sesuai skema pada ins
       return {
         success: false,
         error: "AI mengembalikan hasil revisi yang tidak lengkap (kemungkinan keluaran terpotong sebelum selesai).",
+      };
+    }
+
+    const qualityIssues = validatePembahasanQuality(revised.pembahasan, revised.opsi, revised.kunci_jawaban);
+    if (qualityIssues.length > 0) {
+      return {
+        success: false,
+        error: `Hasil revisi AI melanggar aturan kualitas: ${qualityIssues.join("; ")}`,
       };
     }
 
@@ -1322,26 +1334,10 @@ ${formatCompetencyPlanPrompt(competencySlotPlans.slice(chunk1Count))}`;
       const v = validateLatexDelimiters(q.pembahasan, "Pembahasan");
       if (!v.valid) reasons.push(v.error!);
 
-      // Deteksi kebocoran monolog internal / meta-reasoning AI pada pembahasan
-      const LEAK_PATTERNS = [
-        /aturan\s+PGK/i,
-        /tidak\s+boleh\s+semua\s+opsi\s+benar/i,
-        /mari\s+(kita\s+)?(ubah|ganti)\s+(teks\s+)?opsi/i,
-        /agar\s+opsi\s+[A-D]\s+(bernilai\s+)?salah/i,
-        /teks\s+opsi\s+[A-D]\s+diubah/i,
-        /pada\s+teks\s+opsi\s+[A-D]\s+di\s+atas\s+tertulis/i,
-        /sebagai\s+AI/i,
-        /saya\s+adalah\s+model\s+AI/i,
-        /sesuai\s+instruksi\s+prompt/i,
-        /cacat\s+desain\s+soal/i,
-      ];
-      for (const pattern of LEAK_PATTERNS) {
-        if (pattern.test(q.pembahasan)) {
-          reasons.push(
-            "Pembahasan memuat kebocoran monolog internal / meta-reasoning AI (proses koreksi prompt/opsi bocor ke pembahasan siswa)."
-          );
-          break;
-        }
+      // Deteksi kebocoran monolog internal, opsi bayangan, dan kontradiksi kunci
+      const qualityIssues = validatePembahasanQuality(q.pembahasan, q.opsi, q.kunci_jawaban);
+      if (qualityIssues.length > 0) {
+        reasons.push(...qualityIssues);
       }
     }
     if (Array.isArray(q.opsi)) {
