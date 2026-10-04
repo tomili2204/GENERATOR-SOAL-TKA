@@ -11,6 +11,14 @@ export const dynamic = "force-dynamic";
  * Dapat juga dipicu manual oleh Admin melalui /api/cron/audit-morning?manual=true
  */
 export async function GET(req: NextRequest) {
+  // Jika berjalan di lingkungan Vercel, matikan cron karena sudah dipindahkan ke VPS
+  if (process.env.VERCEL === "1") {
+    return NextResponse.json({
+      success: true,
+      message: "Cron audit pagi dinonaktifkan di Vercel. Seluruh cron dikelola oleh VPS Hostinger.",
+    });
+  }
+
   try {
     const authHeader = req.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;

@@ -17,6 +17,14 @@ export async function POST(req: NextRequest) {
 
 async function handleCron(req: NextRequest) {
   try {
+    // Jika berjalan di lingkungan Vercel, matikan cron karena sudah dipindahkan ke VPS
+    if (process.env.VERCEL === "1") {
+      return NextResponse.json({
+        success: true,
+        message: "Cron generation dinonaktifkan di Vercel. Seluruh cron dikelola oleh VPS Hostinger.",
+      });
+    }
+
     // 1. Verifikasi CRON_SECRET jika dikonfigurasi di environment
     const authHeader = req.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
