@@ -31,6 +31,7 @@ export interface ValidateQuestionInput {
   elemen: string;
   sub_elemen?: string;
   kompetensi: string;
+  indikator?: string;
   level_kognitif: string;
   tingkat_kesulitan: string;
   bentuk_soal: string;
@@ -91,6 +92,17 @@ export function validateQuestionData(data: Partial<ValidateQuestionInput>): Vali
   } else {
     const isMatematika = data.mapel?.toLowerCase().includes("matematika");
     const isBahasa = data.mapel?.toLowerCase().includes("bahasa");
+
+    // Normalisasi variasi/singkatan nilai lama
+    if (isMatematika) {
+      if (
+        data.level_kognitif === "Pemahaman" ||
+        data.level_kognitif === "Pengetahuan" ||
+        data.level_kognitif.toLowerCase() === "rendah"
+      ) {
+        data.level_kognitif = "Pengetahuan dan Pemahaman";
+      }
+    }
 
     if (isMatematika && !LEVEL_KOGNITIF_MATEMATIKA.includes(data.level_kognitif as any)) {
       errors.push(

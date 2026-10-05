@@ -5,6 +5,7 @@ import { LatexPreview } from "@/components/ui/LatexPreview";
 import { SvgIllustration } from "@/components/ui/SvgIllustration";
 import { GambarIllustration } from "@/components/ui/GambarIllustration";
 import { ValidatorNoteText } from "@/components/ui/ValidatorNoteText";
+import { HierarkiIndikatorCard } from "@/components/soal/HierarkiIndikatorCard";
 import { validateLatexDelimiters } from "@/lib/validations/latex";
 import { StimulusSelector } from "@/components/pembuat/StimulusSelector";
 import { SlotData } from "./PackageSlotGrid";
@@ -544,6 +545,15 @@ export function SlotQuestionModal({
           {mode === "view" && q ? (
             /* ================= VIEW MODE ================= */
             <div className="space-y-6">
+              {/* Hierarki Indikator Resmi Pusmendik */}
+              <HierarkiIndikatorCard
+                mapel={packageData.mapel}
+                elemen={q.elemen}
+                subElemen={q.subElemen}
+                kompetensi={q.kompetensi}
+                indikator={q.indikator}
+              />
+
               {/* Stimulus jika ada */}
               {q.stimulus && (
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">

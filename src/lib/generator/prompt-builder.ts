@@ -140,13 +140,30 @@ const RUMUS_DAN_PEMBAHASAN = `PENULISAN RUMUS DAN PEMBAHASAN:
 - DILARANG KERAS menyertakan proses berpikir/monolog internal AI atau evaluasi instruksi prompt (seperti "karena aturan PGK tidak boleh semua benar", "mari kita ubah opsi", "mari beri opsi benar", "mari gunakan angka lain", "agar opsi D bernilai salah", "agar pas bulat", "mungkin salah ketik", "sebagai AI", dsb) ke dalam "pembahasan". Pembahasan HANYA berisi penjelasan konsep, penjabaran langkah hitungan untuk siswa, dan simpulan jawaban.
 - DILARANG KERAS memunculkan huruf opsi bayangan di dalam "pembahasan" yang tidak terdapat pada daftar opsi (misalnya menyebut Opsi E atau Pernyataan E padahal opsi hanya sampai D).`;
 
-const FORMAT_KELUARAN = `FORMAT KELUARAN — WAJIB, TIDAK BOLEH DILANGGAR:
+function formatKeluaranBlock(mapel: string): string {
+  const isBahasa = mapel.toLowerCase().includes("indonesia") || mapel.toLowerCase().includes("inggris");
+  const taxonomyGuide = isBahasa
+    ? `ATURAN TAKSONOMI RESMI BAHASA INDONESIA (3 Tingkat Sesuai Standar Pusmendik):
+- "elemen": isi dengan Kompetensi Membaca utama ("Pemahaman Tekstual", "Pemahaman Inferensial", atau "Evaluasi dan Apresiasi").
+- "sub_elemen": isi dengan Subkompetensi spesifik (misal: "Mengidentifikasi informasi tersurat dalam teks.", "Menyimpulkan ide pokok...", atau "Menilai keakuratan fakta vs opini...").
+- "kompetensi": isi sama dengan Kompetensi Membaca utama ("Pemahaman Tekstual", "Pemahaman Inferensial", atau "Evaluasi dan Apresiasi").
+- "indikator": isi dengan rumusan Indikator Soal resmi (misal: "Menentukan informasi tersurat pada teks. (1)" atau "Menyimpulkan tujuan penulis dalam teks. (7)").`
+    : `ATURAN TAKSONOMI RESMI MATEMATIKA (4 Tingkat Sesuai Standar Pusmendik):
+- "elemen": isi dengan Elemen Matematika ("Bilangan", "Aljabar", "Geometri dan Pengukuran", atau "Data dan Ketidakpastian").
+- "sub_elemen": isi dengan Subelemen materi ("Bilangan Real", "Bilangan Rasional", "Persamaan dan Pertidaksamaan", "Geometri Datar", "Penyajian Data", dsb).
+- "kompetensi": isi dengan rumusan Kompetensi Capaian (misal: "Kemampuan memahami, mengaplikasikan, dan bernalar yang lebih tinggi untuk menyelesaikan permasalahan terkait perbandingan dan sifat-sifat bilangan").
+- "indikator": isi dengan rumusan Indikator Soal spesifik (misal: "Menyelesaikan operasi bilangan bentuk pangkat (1)").`;
+
+  return `FORMAT KELUARAN — WAJIB, TIDAK BOLEH DILANGGAR:
 Kembalikan HANYA array JSON valid, tanpa teks lain di luar JSON dan tanpa markdown code fence.
-Di dalam teks (soal_text, pembahasan, stimulus, opsi) jangan memakai tanda petik ganda lurus (\\") untuk dialog atau kutipan; pakai petik tunggal ('...') atau petik lengkung (“...”) agar JSON tidak rusak.
+Di dalam teks (soal_text, pembahasan, stimulus, opsi) jangan memakai tanda petik ganda lurus (\") untuk dialog atau kutipan; pakai petik tunggal ('...') atau petik lengkung (“...”) agar JSON tidak rusak.
+
+${taxonomyGuide}
+
 Setiap objek soal memiliki field persis berikut (perhatikan urutan: selesaikan "pembahasan" terlebih dahulu sebelum menulis kunci dan opsi):
 {
   "jenjang": string, "mapel": string, "elemen": string, "sub_elemen": string,
-  "kompetensi": string, "level_kognitif": string, "tingkat_kesulitan": "rendah"|"sedang"|"tinggi",
+  "kompetensi": string, "indikator": string, "level_kognitif": string, "tingkat_kesulitan": "rendah"|"sedang"|"tinggi",
   "bentuk_soal": "PG"|"PGK_MCMA"|"PGK_KATEGORI", "jenis_soal": "tunggal"|"grup",
   "stimulus_id_sementara": string|null,
   "tema_konteks": string (2-5 kata ringkasan situasi soal),
@@ -159,6 +176,7 @@ Setiap objek soal memiliki field persis berikut (perhatikan urutan: selesaikan "
   "kategori_respons": [string] | null
 }
 Untuk soal grup, beri stimulus_id_sementara yang sama pada semua butir dalam grup (mis. "stim-1"), dan letakkan objek stimulus terpisah di awal array: {"stimulus_id_sementara": string, "tipe": "teks"|"data", "konten": string}. Objek stimulus dibedakan dari objek soal karena tidak memiliki field "bentuk_soal".`;
+}
 
 export function buildSystemPrompt(jenjang: string, mapel: string): string {
   const m = mapel.toLowerCase();
@@ -174,7 +192,7 @@ export function buildSystemPrompt(jenjang: string, mapel: string): string {
     isBahasa ? bahasaRules(jenjang) : "",
     VISUAL_RULES,
     RUMUS_DAN_PEMBAHASAN,
-    FORMAT_KELUARAN,
+    formatKeluaranBlock(mapel),
   ]
     .filter(Boolean)
     .join("\n\n");

@@ -92,6 +92,7 @@ export async function POST(req: NextRequest) {
       kategori_respons: body.kategori_respons || [],
       kunci_jawaban: body.kunci_jawaban || [],
       pembahasan: body.pembahasan,
+      indikator: body.indikator || null,
     };
 
     // 5. Aturan Penegakan Backend:
@@ -104,6 +105,7 @@ export async function POST(req: NextRequest) {
       elemen: body.elemen,
       subElemen: body.sub_elemen || null,
       kompetensi: body.kompetensi,
+      indikator: body.indikator || null,
       levelKognitif: body.level_kognitif,
       tingkatKesulitan: body.tingkat_kesulitan,
       bentukSoal: body.bentuk_soal,

@@ -109,6 +109,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       kategori_respons: body.kategori_respons || [],
       kunci_jawaban: body.kunci_jawaban || [],
       pembahasan: body.pembahasan,
+      indikator: body.indikator !== undefined ? (body.indikator?.trim() || null) : (existingQuestion.payload as any)?.indikator || null,
     };
 
     // 4. Update dan kunci otomatis status ke "menunggu_validasi" untuk ditelaah ulang
@@ -120,6 +121,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         elemen: body.elemen,
         subElemen: body.sub_elemen || null,
         kompetensi: body.kompetensi,
+        indikator: body.indikator !== undefined ? (body.indikator?.trim() || null) : existingQuestion.indikator,
         levelKognitif: body.level_kognitif,
         tingkatKesulitan: body.tingkat_kesulitan,
         bentukSoal: body.bentuk_soal,

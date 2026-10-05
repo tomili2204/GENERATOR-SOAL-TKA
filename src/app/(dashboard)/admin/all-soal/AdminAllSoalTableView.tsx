@@ -8,6 +8,7 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { LatexPreview } from "@/components/ui/LatexPreview";
 import { GambarIllustration } from "@/components/ui/GambarIllustration";
 import { ValidatorNoteText } from "@/components/ui/ValidatorNoteText";
+import { HierarkiIndikatorCard } from "@/components/soal/HierarkiIndikatorCard";
 import { isJenjangMatch } from "@/lib/jenjang-utils";
 import {
   Search,
@@ -712,34 +713,39 @@ export function AdminAllSoalTableView({
               )}
 
               {modalTab === "metadata" && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-sans">
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2.5">
-                    <span className="text-[11px] font-bold font-mono uppercase tracking-wider text-slate-500 block">
-                      Taksonomi & Kompetensi
-                    </span>
-                    <div className="space-y-1.5">
-                      <div>
-                        <span className="text-slate-400">Elemen:</span>{" "}
-                        <span className="font-semibold text-slate-800">{selectedQuestion.elemen}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400">Sub-Elemen:</span>{" "}
-                        <span className="font-semibold text-slate-800">{selectedQuestion.subElemen || "–"}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400">Kompetensi:</span>{" "}
-                        <span className="text-slate-800">{selectedQuestion.kompetensi || "–"}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400">Level Kognitif:</span>{" "}
-                        <span className="font-semibold text-slate-800">{selectedQuestion.levelKognitif || "–"}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400">Tingkat Kesulitan:</span>{" "}
-                        <span className="font-semibold text-slate-800 capitalize">{selectedQuestion.tingkatKesulitan || "–"}</span>
+                <div className="space-y-4">
+                  <HierarkiIndikatorCard
+                    mapel={selectedQuestion.mapel}
+                    elemen={selectedQuestion.elemen}
+                    subElemen={selectedQuestion.subElemen}
+                    kompetensi={selectedQuestion.kompetensi}
+                    indikator={selectedQuestion.indikator}
+                  />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-sans">
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2.5">
+                      <span className="text-[11px] font-bold font-mono uppercase tracking-wider text-slate-500 block">
+                        Karakteristik Kognitif & Format
+                      </span>
+                      <div className="space-y-1.5">
+                        <div>
+                          <span className="text-slate-400">Level Kognitif:</span>{" "}
+                          <span className="font-semibold text-slate-800">{selectedQuestion.levelKognitif || "–"}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Tingkat Kesulitan:</span>{" "}
+                          <span className="font-semibold text-slate-800 capitalize">{selectedQuestion.tingkatKesulitan || "–"}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Bentuk Soal:</span>{" "}
+                          <span className="font-semibold text-slate-800">{selectedQuestion.bentukSoal}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Jenis Soal:</span>{" "}
+                          <span className="font-semibold text-slate-800 capitalize">{selectedQuestion.jenisSoal}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2.5">
                     <span className="text-[11px] font-bold font-mono uppercase tracking-wider text-slate-500 block">
@@ -787,6 +793,7 @@ export function AdminAllSoalTableView({
                     </div>
                   </div>
                 </div>
+              </div>
               )}
             </div>
 

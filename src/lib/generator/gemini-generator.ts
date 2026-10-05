@@ -1977,6 +1977,7 @@ ${curriculumGuidance}`;
       kategori_respons: vq.kategori_respons || [],
       kunci_jawaban: vq.kunci_jawaban || [],
       pembahasan: vq.pembahasan,
+      indikator: vq.indikator || null,
       // Metadata Keberagaman (Lapis 2 & Lapis 4)
       target_arketipe: assignedArchetype,
       similarity_score: checkSim.score,
@@ -1995,6 +1996,7 @@ ${curriculumGuidance}`;
         : vq.elemen,
       subElemen: vq.sub_elemen,
       kompetensi: vq.kompetensi,
+      indikator: vq.indikator || null,
       levelKognitif: vq.level_kognitif,
       tingkatKesulitan: vq.tingkat_kesulitan,
       bentukSoal: vq.bentuk_soal,

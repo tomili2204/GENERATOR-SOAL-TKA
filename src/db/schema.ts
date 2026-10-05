@@ -132,6 +132,7 @@ export const questions = soalSchema.table("questions", {
   elemen: text("elemen").notNull(),
   subElemen: text("sub_elemen"),
   kompetensi: text("kompetensi"),
+  indikator: text("indikator"),
   levelKognitif: text("level_kognitif"),
   tingkatKesulitan: text("tingkat_kesulitan").$type<TingkatKesulitanType>(),
   bentukSoal: text("bentuk_soal").$type<BentukSoalType>().default("PG").notNull(),

@@ -51,9 +51,23 @@ async function handleCron(req: NextRequest) {
 
     // 3. Ambil parameter target (opsional) dari query parameter
     const { searchParams } = new URL(req.url);
-    const targetConfigId = searchParams.get("configId")?.trim();
-    const targetJenjang = searchParams.get("jenjang")?.trim();
-    const targetMapel = searchParams.get("mapel")?.trim();
+    let targetConfigId = searchParams.get("configId")?.trim();
+    let targetJenjang = searchParams.get("jenjang")?.trim();
+    let targetMapel = searchParams.get("mapel")?.trim();
+    const targetScope = searchParams.get("scope")?.trim()?.toLowerCase();
+
+    // Petakan parameter scope dari cron VPS (sd-mat, sd-bin, smp-mat, smp-bin)
+    if (targetScope) {
+      if (targetScope === "sd-mat") {
+        targetConfigId = "gen-sd-mat";
+      } else if (targetScope === "sd-bin" || targetScope === "sd-indo") {
+        targetConfigId = "gen-sd-indo";
+      } else if (targetScope === "smp-mat") {
+        targetConfigId = "gen-smp-mat";
+      } else if (targetScope === "smp-bin" || targetScope === "smp-indo") {
+        targetConfigId = "gen-smp-indo";
+      }
+    }
 
     // 4. Cari konfigurasi generator yang aktif otomatis
     let activeConfigs = await db

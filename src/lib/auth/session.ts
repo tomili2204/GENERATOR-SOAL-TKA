@@ -37,6 +37,7 @@ export async function setSessionCookie(token: string) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
+    domain: process.env.NODE_ENV === "production" ? ".ayotka.id" : undefined,
     maxAge: 60 * 60 * 24 * 7, // 7 hari
   });
 }
@@ -56,5 +57,10 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
 export async function clearSessionCookie() {
   const cookieStore = cookies();
+  cookieStore.delete({
+    name: COOKIE_NAME,
+    path: "/",
+    domain: process.env.NODE_ENV === "production" ? ".ayotka.id" : undefined,
+  });
   cookieStore.delete(COOKIE_NAME);
 }
