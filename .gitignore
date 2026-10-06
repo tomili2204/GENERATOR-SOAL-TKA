@@ -24,6 +24,7 @@
 /.data/
 /.data_backup/
 /scratch/
+/public/soal-images/
 *.tar.gz
 *.log
 npm-debug.log*
