@@ -34,7 +34,7 @@ import {
   checkQuestionSimilarity,
 } from "./similarity-checker";
 import { validatePembahasanQuality } from "@/lib/validations/question";
-
+import { saveBase64Image } from "@/lib/images/storage";
 
 export interface StoredAiConfig {
   apiKey: string;
@@ -1890,9 +1890,10 @@ ${curriculumGuidance}`;
 
       if (result.success && result.dataUri) {
         const svgFallback = vq.gambar.svg_content;
+        const imageUrl = saveBase64Image(result.dataUri, `soal-gen-${Date.now()}`);
         vq.gambar = {
           tipe: "ilustrasi_kontekstual",
-          image_data: result.dataUri,
+          url: imageUrl,
           deskripsi_alt: deskripsiAlt,
           svg_fallback: svgFallback,
         };
