@@ -32,7 +32,8 @@ export function GambarIllustration({ gambar, className = "" }: GambarIllustratio
     return <SvgIllustration svgContent={gambar.svg_content} altText={gambar.deskripsi_alt} className={className} />;
   }
 
-  if (gambar.tipe === "ilustrasi_kontekstual" && gambar.image_data) {
+  if (gambar.tipe === "ilustrasi_kontekstual" && (gambar.url || gambar.image_data)) {
+    const imgSrc = (gambar.url || gambar.image_data) as string;
     if (gambar.svg_fallback) {
       return (
         <div className={`space-y-2 ${className}`}>
@@ -65,7 +66,7 @@ export function GambarIllustration({ gambar, className = "" }: GambarIllustratio
             <SvgIllustration svgContent={gambar.svg_fallback} altText={gambar.deskripsi_alt} />
           ) : (
             <img
-              src={gambar.image_data}
+              src={imgSrc}
               alt={gambar.deskripsi_alt || "Ilustrasi kontekstual"}
               className="max-w-full max-h-96 mx-auto rounded-lg border border-slate-200 object-contain block"
             />
@@ -76,7 +77,7 @@ export function GambarIllustration({ gambar, className = "" }: GambarIllustratio
 
     return (
       <img
-        src={gambar.image_data}
+        src={imgSrc}
         alt={gambar.deskripsi_alt || "Ilustrasi kontekstual"}
         className={`max-w-full max-h-96 mx-auto rounded-lg border border-slate-200 object-contain block ${className}`}
       />
