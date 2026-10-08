@@ -46,3 +46,6 @@ Thumbs.db
 
 .vercel
 .env*
+
+# Backup situs WordPress (berisi data sensitif, jangan di-commit)
+/backup-wp/

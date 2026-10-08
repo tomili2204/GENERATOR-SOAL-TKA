@@ -88,10 +88,10 @@ export async function selectThemeForGeneration(
 
   const usedThemes = new Set<string>();
   for (const q of filteredRecentQuestions) {
-    if (q.temaKonteks) usedThemes.add(q.temaKonteks.toLowerCase().trim());
+    if (q.temaKonteks) usedThemes.add(String(q.temaKonteks).toLowerCase().trim());
   }
   for (const l of filteredRecentLogs) {
-    if (l.temaKonteks) usedThemes.add(l.temaKonteks.toLowerCase().trim());
+    if (l.temaKonteks) usedThemes.add(String(l.temaKonteks).toLowerCase().trim());
   }
 
   // 4. Terapkan pengecualian 4 hari terakhir pada kandidat jenjang

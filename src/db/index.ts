@@ -37,9 +37,14 @@ export function getDb() {
 
   if (databaseUrl && databaseUrl.trim() !== "") {
     if (!globalForDb.pgPool) {
+      const isLocal =
+        databaseUrl.includes("localhost") ||
+        databaseUrl.includes("127.0.0.1") ||
+        databaseUrl.includes("sslmode=disable");
+
       globalForDb.pgPool = new Pool({
         connectionString: databaseUrl,
-        ssl: { rejectUnauthorized: false },
+        ssl: isLocal ? false : { rejectUnauthorized: false },
         max: 5,
         connectionTimeoutMillis: 10000,
       });

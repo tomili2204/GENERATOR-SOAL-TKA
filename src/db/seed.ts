@@ -105,13 +105,12 @@ export async function seedDatabase() {
   // Seed Taxonomies (Elemen Materi)
   const taxonomies = [
     { id: "tax-1", jenjang: "SD/MI" as const, mapel: "Matematika" as const, category: "elemen", code: "BIL", name: "Bilangan", sortOrder: 1 },
-    { id: "tax-2", jenjang: "SD/MI" as const, mapel: "Matematika" as const, category: "elemen", code: "ALJ", name: "Aljabar & Pola", sortOrder: 2 },
-    { id: "tax-3", jenjang: "SD/MI" as const, mapel: "Matematika" as const, category: "elemen", code: "GEO", name: "Geometri", sortOrder: 3 },
-    { id: "tax-4", jenjang: "SD/MI" as const, mapel: "Matematika" as const, category: "elemen", code: "UKR", name: "Pengukuran", sortOrder: 4 },
-    { id: "tax-5", jenjang: "SD/MI" as const, mapel: "Matematika" as const, category: "elemen", code: "DAT", name: "Pengolahan Data", sortOrder: 5 },
+    // Elemen SD/MI menurut Kerangka Asesmen TKA (Perkaban BSKAP 047/H/AN/2025): hanya 3, tanpa Aljabar.
+    { id: "tax-3", jenjang: "SD/MI" as const, mapel: "Matematika" as const, category: "elemen", code: "GEO", name: "Geometri dan Pengukuran", sortOrder: 2 },
+    { id: "tax-5", jenjang: "SD/MI" as const, mapel: "Matematika" as const, category: "elemen", code: "DAT", name: "Data", sortOrder: 3 },
     { id: "tax-6", jenjang: "SD/MI" as const, mapel: "Bahasa Indonesia" as const, category: "elemen", code: "TEK", name: "Pemahaman Tekstual", sortOrder: 1 },
     { id: "tax-7", jenjang: "SD/MI" as const, mapel: "Bahasa Indonesia" as const, category: "elemen", code: "INF", name: "Pemahaman Inferensial", sortOrder: 2 },
-    { id: "tax-8", jenjang: "SD/MI" as const, mapel: "Bahasa Indonesia" as const, category: "elemen", code: "EVA", name: "Evaluasi & Refleksi", sortOrder: 3 },
+    { id: "tax-8", jenjang: "SD/MI" as const, mapel: "Bahasa Indonesia" as const, category: "elemen", code: "EVA", name: "Evaluasi dan Apresiasi", sortOrder: 3 },
   ];
 
   for (const t of taxonomies) {

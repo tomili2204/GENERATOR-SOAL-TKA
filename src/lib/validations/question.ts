@@ -174,16 +174,18 @@ export function validateQuestionData(data: Partial<ValidateQuestionInput>): Vali
     } else {
       const labels = new Set<string>();
       data.opsi.forEach((op, idx) => {
-        if (!op.label || op.label.trim() === "") {
+        const labelStr = String(op?.label ?? "").trim();
+        if (!labelStr) {
           errors.push(`Label opsi ke-${idx + 1} tidak boleh kosong.`);
         } else {
-          labels.add(op.label.trim());
+          labels.add(labelStr);
         }
 
-        if (!op.text || op.text.trim() === "") {
-          errors.push(`Teks pada opsi ${op.label || idx + 1} tidak boleh kosong.`);
+        const textStr = String(op?.text ?? "").trim();
+        if (!textStr) {
+          errors.push(`Teks pada opsi ${op?.label || idx + 1} tidak boleh kosong.`);
         } else {
-          const check = validateLatexDelimiters(op.text, `Opsi ${op.label || idx + 1}`);
+          const check = validateLatexDelimiters(textStr, `Opsi ${op?.label || idx + 1}`);
           if (!check.valid && check.error) {
             errors.push(check.error);
           }
@@ -193,7 +195,7 @@ export function validateQuestionData(data: Partial<ValidateQuestionInput>): Vali
       if (bentuk === "PG") {
         if (kunciJawaban.length !== 1) {
           errors.push(`Untuk soal Pilihan Ganda (PG), kunci_jawaban harus berisi tepat 1 label (ditemukan: ${kunciJawaban.length}).`);
-        } else if (!labels.has(kunciJawaban[0])) {
+        } else if (!labels.has(String(kunciJawaban[0] ?? "").trim())) {
           errors.push(`Kunci jawaban "${kunciJawaban[0]}" tidak ditemukan di dalam daftar label opsi.`);
         }
       } else if (bentuk === "PGK_MCMA") {
@@ -201,7 +203,7 @@ export function validateQuestionData(data: Partial<ValidateQuestionInput>): Vali
           errors.push("Untuk soal PGK MCMA (Pilihan Ganda Kompleks Multi-Jawaban), kunci_jawaban harus berisi minimal 1 label.");
         } else {
           for (const ans of kunciJawaban) {
-            if (!labels.has(ans)) {
+            if (!labels.has(String(ans ?? "").trim())) {
               errors.push(`Kunci jawaban "${ans}" tidak ditemukan di dalam daftar label opsi.`);
             }
           }
@@ -220,10 +222,11 @@ export function validateQuestionData(data: Partial<ValidateQuestionInput>): Vali
     }
 
     pernyataan.forEach((item, idx) => {
-      if (!item.text || item.text.trim() === "") {
-        errors.push(`Pernyataan nomor ${item.no || idx + 1} tidak boleh kosong.`);
+      const textStr = String(item?.text ?? "").trim();
+      if (!textStr) {
+        errors.push(`Pernyataan nomor ${item?.no || idx + 1} tidak boleh kosong.`);
       } else {
-        const check = validateLatexDelimiters(item.text, `Pernyataan No. ${item.no || idx + 1}`);
+        const check = validateLatexDelimiters(textStr, `Pernyataan No. ${item?.no || idx + 1}`);
         if (!check.valid && check.error) {
           errors.push(check.error);
         }
@@ -239,9 +242,13 @@ export function validateQuestionData(data: Partial<ValidateQuestionInput>): Vali
     }
 
     // 2. Tiap elemen kunci_jawaban pada PGK_KATEGORI harus salah satu nilai di kategori_respons.
-    const validKategoriSet = new Set(kategori.map((k) => k.trim()));
+    const validKategoriSet = new Set(kategori.map((k) => String(k ?? "").trim()));
     kunciJawaban.forEach((ans, idx) => {
-      if (!validKategoriSet.has(ans?.trim())) {
+      let ansStr = String(ans ?? "").trim();
+      if (typeof ans === "boolean") {
+        ansStr = ans ? "Benar" : "Salah";
+      }
+      if (!validKategoriSet.has(ansStr)) {
         errors.push(
           `Kunci jawaban baris ke-${idx + 1} ("${ans}") tidak valid. Harus salah satu dari kategori: [${kategori.join(", ")}].`
         );

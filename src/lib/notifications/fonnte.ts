@@ -83,3 +83,76 @@ export async function sendWhatsAppMessage(options: FonnteSendOptions): Promise<F
     };
   }
 }
+
+/**
+ * Memeriksa status koneksi device WhatsApp di Fonnte
+ */
+export async function getWhatsAppDeviceStatus(): Promise<{
+  success: boolean;
+  device?: string;
+  deviceStatus?: "connect" | "disconnect" | string;
+  name?: string;
+  quota?: string;
+  message?: string;
+  raw?: any;
+}> {
+  const token = process.env.FONNTE_TOKEN || process.env.WA_GATEWAY_TOKEN;
+  if (!token) {
+    return { success: false, message: "FONNTE_TOKEN belum diatur." };
+  }
+
+  try {
+    const res = await fetch("https://api.fonnte.com/device", {
+      method: "POST",
+      headers: { Authorization: token },
+    });
+    const data = await res.json();
+    return {
+      success: !!data.status,
+      device: data.device,
+      deviceStatus: data.device_status,
+      name: data.name,
+      quota: data.quota,
+      raw: data,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error?.message || "Gagal memeriksa status device Fonnte.",
+    };
+  }
+}
+
+/**
+ * Mengambil QR Code untuk login/reconnect device WhatsApp Fonnte (base64 PNG)
+ */
+export async function getWhatsAppQRCode(): Promise<{
+  success: boolean;
+  connected?: boolean;
+  qrBase64?: string;
+  message?: string;
+}> {
+  const token = process.env.FONNTE_TOKEN || process.env.WA_GATEWAY_TOKEN;
+  if (!token) {
+    return { success: false, message: "FONNTE_TOKEN belum diatur." };
+  }
+
+  try {
+    const res = await fetch("https://api.fonnte.com/qr", {
+      method: "POST",
+      headers: { Authorization: token },
+    });
+    const data = await res.json();
+    return {
+      success: !!data.status,
+      connected: data.connected,
+      qrBase64: data.url, // Base64 image
+      message: data.message,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error?.message || "Gagal mengambil QR Code Fonnte.",
+    };
+  }
+}

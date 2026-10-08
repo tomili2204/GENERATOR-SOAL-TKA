@@ -176,12 +176,38 @@ function focusTableFor(jenjang: string): ElementFocus[] {
 }
 
 function shuffled<T>(list: T[]): T[] {
-  return [...list].sort(() => 0.5 - Math.random());
+  const result = [...list];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }
 
 /** "Geometri & Pengukuran" dan "geometri dan pengukuran" dianggap nama elemen yang sama. */
 export function normalizeElemenName(name: string): string {
   return name.toLowerCase().replace(/&/g, " dan ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Nama elemen Matematika resmi menurut Kerangka Asesmen TKA (Perkaban BSKAP 047/H/AN/2025):
+ *   SD/MI  : Bilangan, Geometri dan Pengukuran, Data
+ *   SMP/SMA: Bilangan, Aljabar, Geometri dan Pengukuran, Data dan Peluang
+ * Varian yang sering muncul dari AI atau input manual (mis. "Data dan Ketidakpastian", "Geometri",
+ * "Pengukuran", "Analisis Data dan Peluang") dipetakan ke nama resmi jenjang bersangkutan.
+ * Nama tak dikenal dikembalikan apa adanya.
+ */
+export function canonicalMathElemen(jenjang: string, raw: unknown): string {
+  const name = typeof raw === "string" ? raw.trim() : "";
+  const n = normalizeElemenName(name).replace(/^analisis\s+/, "");
+  if (!n) return name;
+  if (/^(geometri|pengukuran|geometri dan pengukuran)$/.test(n)) return "Geometri dan Pengukuran";
+  if (n === "bilangan") return "Bilangan";
+  if (n.startsWith("aljabar")) return "Aljabar";
+  if (/^(data|pengolahan data|data dan ketidakpastian|data dan peluang)$/.test(n)) {
+    return jenjang.includes("SD") ? "Data" : "Data dan Peluang";
+  }
+  return name;
 }
 
 export interface MathCurriculumElement {
@@ -252,8 +278,11 @@ export function formatCompetencyPlanPrompt(slots: SlotPlan[]): string {
 
   const lines = slots.map((s, idx) => `${idx + 1}. ${s.elemen} — ${s.fokus}`).join("\n");
 
-  return `\n\nRENCANA CAKUPAN KOMPETENSI (satu baris = satu butir soal, ikuti urutannya):
+  return `\n\nRENCANA CAKUPAN KOMPETENSI PER BUTIR (satu baris = satu butir soal, ikuti urutannya):
 ${lines}
 
-Rencana ini hanya menentukan kompetensi yang diuji tiap butir. Konteks cerita, tokoh, dan angka sepenuhnya kreasi Anda mengikuti gaya soal resmi. Isi field "elemen" sesuai rencana. Butir berurutan dengan kompetensi berdekatan boleh berbagi satu stimulus grup.`;
+ATURAN KETAT CAKUPAN KOMPETENSI:
+- Anda WAJIB mengikuti urutan fokus kompetensi di atas persis sesuai nomor butir soalnya (butir #1 wajib menguji fokus pada baris 1, butir #2 baris 2, dst)!
+- JANGAN PERNAH berasumsi bahwa nomor 1 harus selalu topik tertentu (misalnya FPB/KPK). Jika baris 1 meminta operasi pecahan atau rasio, maka butir #1 WAJIB menguji topik tersebut!
+- Konteks cerita, tokoh, dan angka sepenuhnya kreasi Anda mengikuti gaya soal resmi. Isi field "elemen" dan "kompetensi" sesuai rencana di atas. Butir berurutan dengan kompetensi berdekatan boleh berbagi satu stimulus grup.`;
 }

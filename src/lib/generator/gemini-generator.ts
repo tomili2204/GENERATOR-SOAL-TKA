@@ -27,7 +27,7 @@ import {
 } from "./text-complexity";
 import { jsonrepair } from "jsonrepair";
 import { fetchRecentQuestionsMemory } from "./sliding-window-memory";
-import { generateCompetencySlotPlan, formatCompetencyPlanPrompt, normalizeElemenName } from "./competency-plan";
+import { generateCompetencySlotPlan, formatCompetencyPlanPrompt, normalizeElemenName, canonicalMathElemen } from "./competency-plan";
 import { buildSystemPrompt } from "./prompt-builder";
 import {
   evaluateBatchSimilarity,
@@ -101,6 +101,82 @@ export function normalizeLanguageLevelKognitif(lk: string): string {
   if (/menginterpretasi/i.test(lk)) return "Pemahaman Inferensial";
   if (/mengevaluasi/i.test(lk)) return "Evaluasi dan Apresiasi";
   return lk;
+}
+
+/**
+ * Urutan huruf kunci yang seimbang (A–D, jatah hampir sama, diacak, tanpa >2 huruf sama berturut-turut)
+ * untuk butir PG. Ditetapkan SEBELUM AI menulis soal, karena pembahasan (yang menyebut huruf kunci)
+ * ditulis bersama soal; mengacak posisi opsi sesudahnya merusak 93% pembahasan. Tanpa pola ini,
+ * pengukuran 262 butir PG menunjukkan kunci condong ke B (41%) dan jarang ke D (10%).
+ */
+export function buildKeyPositionSequence(pgCount: number): string[] {
+  const letters = ["A", "B", "C", "D"];
+  const base: string[] = [];
+  for (let i = 0; i < pgCount; i++) base.push(letters[i % letters.length]);
+
+  const runOk = (s: string[]) => s.every((l, i) => i < 2 || !(l === s[i - 1] && l === s[i - 2]));
+  let best = base;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const s = [...base];
+    for (let i = s.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [s[i], s[j]] = [s[j], s[i]];
+    }
+    best = s;
+    if (runOk(s)) break;
+  }
+  return best;
+}
+
+export function buildKeyPositionInstruction(pgCount: number): string {
+  if (pgCount < 4) return "";
+  const seq = buildKeyPositionSequence(pgCount);
+  return `
+
+POLA POSISI KUNCI PG (WAJIB — agar kunci jawaban tersebar merata dan tidak bisa ditebak):
+Hitung butir berbentuk PG secara berurutan sesuai kemunculannya di array keluaran (butir PGK_MCMA dan PGK_KATEGORI tidak dihitung). Letakkan jawaban benar tepat pada huruf berikut:
+${seq.map((l, i) => `PG ke-${i + 1} = ${l}`).join(", ")}.
+Susun opsi (jawaban benar dan pengecoh) agar jawaban benar jatuh pada huruf tersebut; untuk opsi berupa angka boleh tetap diurutkan menaik atau menurun, pilih nilai pengecoh yang menyesuaikan. "kunci_jawaban" dan kesimpulan pada "pembahasan" harus menyebut huruf yang sama.`;
+}
+
+/** Tiga label level kognitif resmi Matematika (BSKAP). Sama dengan yang diperiksa audit pagi. */
+export const MATH_LEVEL_KOGNITIF = ["Pengetahuan dan Pemahaman", "Aplikasi", "Penalaran"];
+
+/**
+ * AI kadang menulis tingkat kesulitan ("Rendah", "Sedang", "Tinggi") atau kode (L1/L2/L3) pada
+ * level_kognitif. Petakan ke label resmi; nilai yang tidak dikenali dikembalikan apa adanya agar
+ * ditolak oleh gerbang validasi (lalu diregenerasi), bukan disimpan salah.
+ */
+export function normalizeMathLevelKognitif(lk: unknown): string {
+  if (typeof lk !== "string") return "";
+  const t = lk.trim();
+  const exact = MATH_LEVEL_KOGNITIF.find((x) => x.toLowerCase() === t.toLowerCase());
+  if (exact) return exact;
+  const s = t.toLowerCase();
+  if (/penalaran|reasoning|bernalar|^l?3$|tinggi/.test(s)) return "Penalaran";
+  if (/aplikasi|application|menerapkan|^l?2$|sedang/.test(s)) return "Aplikasi";
+  if (/pengetahuan|pemahaman|knowing|memahami|^l?1$|rendah|dasar/.test(s)) return "Pengetahuan dan Pemahaman";
+  return t;
+}
+
+/**
+ * Jaring pengaman taksonomi Matematika pada satu butir hasil AI: menormalkan level_kognitif (mengubah q)
+ * dan mengembalikan daftar alasan penolakan bila level tidak sah atau elemen Aljabar dipakai pada SD/MI
+ * (bukan elemen resmi SD/MI — lihat competency-plan.ts).
+ */
+export function applyMathTaxonomyGuards(q: any, jenjang: string): string[] {
+  const reasons: string[] = [];
+  q.level_kognitif = normalizeMathLevelKognitif(q.level_kognitif);
+  if (typeof q.elemen === "string") q.elemen = canonicalMathElemen(jenjang, q.elemen);
+  if (q.level_kognitif && !MATH_LEVEL_KOGNITIF.includes(q.level_kognitif)) {
+    reasons.push(
+      `Level kognitif "${q.level_kognitif}" tidak sah; harus salah satu dari: ${MATH_LEVEL_KOGNITIF.join(", ")}.`
+    );
+  }
+  if (jenjang.includes("SD") && normalizeElemenName(String(q.elemen ?? "")).includes("aljabar")) {
+    reasons.push('Elemen "Aljabar" bukan elemen resmi SD/MI (hanya Bilangan, Geometri dan Pengukuran, Data).');
+  }
+  return reasons;
 }
 
 /**
@@ -375,6 +451,49 @@ export async function callNanoBananaImage(apiKey: string, prompt: string): Promi
 }
 
 /**
+ * `konten` stimulus dari AI seharusnya teks/markdown, tetapi untuk stimulus bertipe "data" (Matematika)
+ * AI kadang mengembalikan array/objek (mis. baris tabel). Ubah ke teks bila bentuknya dikenali;
+ * kembalikan null bila tidak bisa dipakai, supaya stimulus ditolak lewat jalur regenerasi yang sudah ada
+ * (bukan menjatuhkan seluruh paket dengan "n.trim is not a function").
+ */
+export function coerceStimulusContent(raw: unknown): string | null {
+  if (raw === undefined || raw === null) return "";
+  if (typeof raw === "string") return raw;
+  if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
+
+  const cell = (v: unknown) => String(v ?? "").replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ").trim();
+  const table = (head: unknown[], rows: unknown[][]) => [
+    `| ${head.map(cell).join(" | ")} |`,
+    `| ${head.map(() => "---").join(" | ")} |`,
+    ...rows.map((r) => `| ${r.map(cell).join(" | ")} |`),
+  ].join("\n");
+
+  if (Array.isArray(raw)) {
+    if (raw.every((x) => typeof x === "string")) return (raw as string[]).join("\n");
+    if (raw.length >= 2 && raw.every((x) => Array.isArray(x))) {
+      const [head, ...rows] = raw as unknown[][];
+      return table(head, rows);
+    }
+    if (raw.length >= 1 && raw.every((x) => x && typeof x === "object" && !Array.isArray(x))) {
+      const head = Object.keys(raw[0] as object);
+      return table(head, (raw as Record<string, unknown>[]).map((o) => head.map((k) => o[k])));
+    }
+    return null;
+  }
+
+  if (typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    const head = (o.headers ?? o.header ?? o.kolom) as unknown;
+    const rows = (o.rows ?? o.baris ?? o.data) as unknown;
+    if (Array.isArray(head) && Array.isArray(rows) && rows.every((r) => Array.isArray(r))) {
+      return table(head, rows as unknown[][]);
+    }
+    if (typeof o.konten === "string") return o.konten;
+  }
+  return null;
+}
+
+/**
  * Parser helper untuk membersihkan format markdown code-fence dari keluaran JSON
  */
 export function parseGeminiJson(rawText: string): any[] {
@@ -572,12 +691,11 @@ ATURAN WAJIB:
 7. Notasi matematika memakai LaTeX; di dalam JSON, escape backslash ganda (\\\\frac, \\\\times, \\\\sqrt, dst). Satu persamaan utuh berada di dalam SATU pasangan $...$, sedangkan kata penjelas dan satuan ditulis di luar tanda $ (contoh benar: Total = $140 + 180 = 320$ kg; contoh salah: $Total $= 140 + 180 = 320$ kg$). Perhitungan panjang boleh ditulis pada baris sendiri sebagai $$...$$.
 8. Field "gambar": jika catatan validator meminta ganti soal/tema total, atau jika soal baru tidak lagi berhubungan dengan gambar lama, WAJIB buat ilustrasi SVG baru yang sesuai dengan topik baru atau kembalikan "gambar": null (DILARANG mempertahankan gambar lama yang tidak relevan). Jika catatan validator TIDAK menyinggung ilustrasi dan topik soal tetap sama, kembalikan "gambar": null (sistem akan mempertahankan ilustrasi asli). Jika catatan validator secara eksplisit meminta perbaikan visual, sertakan revisi "gambar" mengikuti salah satu format: {"tipe": "svg", "svg_content": "<svg viewBox=\\"0 0 480 300\\" width=\\"100%\\" xmlns=\\"http://www.w3.org/2000/svg\\">...</svg>", "deskripsi_alt": "..."} untuk geometri/denah bebas, atau {"tipe": "diagram", "archetype": "diagram_batang"|"diagram_lingkaran"|"model_pecahan"|"garis_bilangan", "data": {...}, "deskripsi_alt": "..."} untuk diagram data/pecahan/garis bilangan (parameter data mengikuti skema masing-masing archetype).
 9. PADA SOAL BENTUK PGK_MCMA (Pilihan Ganda Kompleks Multi-Jawaban):
-   - DILARANG membuat semua opsi bernilai benar (semua opsi benar adalah cacat desain soal asesmen).
-   - Jika validator menyarankan agar "tidak semua jawaban benar" atau meminta agar "ada jawaban yang bernilai salah", JANGAN SELALU membuat pola malas yang hanya menyalahkan tepat 1 opsi (3 benar, 1 salah).
-   - VARIASIKAN jumlah opsi yang benar secara proporsional dan mendidik:
+   - VARIASIKAN jumlah opsi yang benar secara proporsional dan seimbang:
      * Kombinasi 2 OPSI BENAR (dan 2 opsi salah) — SANGAT DISARANKAN untuk daya beda asesmen penalaran.
-     * Kombinasi 1 OPSI BENAR (dan 3 opsi salah) — sangat baik untuk mengecoh miskonsepsi umum.
+     * Kombinasi 1 OPSI BENAR (dan 3 opsi salah) — sangat baik untuk menguji ketelitian dan mengecoh miskonsepsi umum.
      * Kombinasi 3 OPSI BENAR (dan 1 opsi salah).
+     * Kombinasi 4 OPSI BENAR (semua benar) diperbolehkan sesekali jika konteks dan pembuktian memang membuktikan seluruh pernyataan benar, namun HINDARI pola seragam di mana semua butir selalu benar semua.
    - Buatlah opsi pengecoh (distraktor salah) dengan kekeliruan konsep, rumus, atau hitungan yang masuk akal bagi siswa, lalu sesuaikan "kunci_jawaban" dan "pembahasan" secara konsisten.
 10. Kembalikan HANYA array JSON valid berisi TEPAT SATU objek, tanpa markdown code fence dan tanpa teks penjelasan apa pun di luar JSON, dengan skema PERSIS (selesaikan "pembahasan" terlebih dahulu sebelum menulis kunci dan opsi):
 [{
@@ -899,6 +1017,7 @@ Pakai tema ini sebagai sumber ide latar untuk sebagian soal jika cocok dengan ko
 Ikuti gaya soal dan contoh acuan pada instruksi sistem, dan sesuaikan banyak langkah berpikir dengan tingkat kesulitan tiap butir.
 ${curriculumGuidance}
 ${competencyPlanBlock}`;
+  userPrompt += buildKeyPositionInstruction(distB.PG);
 
   // Pembatasan Elemen Materi jika dipilih sebagian oleh admin
   let elementRestrictionPrompt = "";
@@ -1023,6 +1142,8 @@ ${formatCompetencyPlanPrompt(competencySlotPlans.slice(0, chunk1Count))}`;
 Ikuti gaya soal dan contoh acuan pada instruksi sistem, dan sesuaikan banyak langkah berpikir dengan tingkat kesulitan tiap butir.
 ${curriculumGuidance}
 ${formatCompetencyPlanPrompt(competencySlotPlans.slice(chunk1Count))}`;
+        p1 += buildKeyPositionInstruction(distB1.PG);
+        p2 += buildKeyPositionInstruction(distB2.PG);
 
         if (elementRestrictionPrompt) {
           p1 += elementRestrictionPrompt;
@@ -1132,7 +1253,20 @@ ${formatCompetencyPlanPrompt(competencySlotPlans.slice(chunk1Count))}`;
 
   for (const stim of stimulusObjects) {
     const tempId = stim.stimulus_id_sementara;
-    let content = stim.konten || "";
+    const coerced = coerceStimulusContent(stim.konten);
+    if (coerced === null) {
+      rejectedStimuli[tempId] = {
+        reasons: ["Format konten stimulus bukan teks dan tidak dapat dikonversi."],
+        metricsSummary: "Konten stimulus tidak valid",
+      };
+      failedItems.push({
+        index: 0,
+        reason: `[GAGAL FORMAT STIMULUS] Stimulus "${tempId}": konten bukan teks (tipe ${Array.isArray(stim.konten) ? "array" : typeof stim.konten}) dan tidak dapat dikonversi.`,
+        itemTitle: `Stimulus Gagal (${tempId})`,
+      });
+      continue;
+    }
+    let content = coerced;
 
     // Pemeriksaan BSKAP (Hanya Bahasa Indonesia/Inggris, Matematika dilewati total)
     let valResult = validateLanguageTextComplexity({
@@ -1241,6 +1375,9 @@ ${formatCompetencyPlanPrompt(competencySlotPlans.slice(chunk1Count))}`;
 
   questionObjects.forEach((q, idx) => {
     const itemNum = idx + 1;
+    // Isolasi per butir: bentuk data tak terduga pada SATU butir (mis. field berupa array, bukan teks)
+    // hanya menggugurkan butir itu, bukan menjatuhkan seluruh paket 30 soal.
+    try {
     const reasons: string[] = [];
 
     // Normalisasi kompetensi & level kognitif Bahasa Indonesia ke 3 label resmi Perkaban BSKAP
@@ -1262,6 +1399,11 @@ ${formatCompetencyPlanPrompt(competencySlotPlans.slice(chunk1Count))}`;
       "pembahasan",
       "tema_konteks",
     ];
+
+    // A0. Taksonomi Matematika: normalisasi level kognitif & larangan Aljabar pada SD/MI
+    if (mapel.toLowerCase().includes("matematika")) {
+      reasons.push(...applyMathTaxonomyGuards(q, jenjang));
+    }
 
     for (const f of requiredFields) {
       if (!q[f] || (typeof q[f] === "string" && !q[f].trim())) {
@@ -1291,15 +1433,8 @@ ${formatCompetencyPlanPrompt(competencySlotPlans.slice(chunk1Count))}`;
       if (!Array.isArray(q.opsi) || q.opsi.length < 2) {
         reasons.push("Bentuk PGK_MCMA wajib memiliki minimal 2 opsi jawaban.");
       }
-      if (
-        Array.isArray(q.opsi) &&
-        Array.isArray(q.kunci_jawaban) &&
-        q.opsi.length >= 2 &&
-        q.kunci_jawaban.length === q.opsi.length
-      ) {
-        reasons.push(
-          "Bentuk PGK_MCMA dilarang membuat semua opsi bernilai benar (cacat desain soal asesmen); minimal 1 opsi harus salah."
-        );
+      if (!Array.isArray(q.kunci_jawaban) || q.kunci_jawaban.length < 1) {
+        reasons.push("Bentuk PGK_MCMA wajib memiliki minimal 1 kunci jawaban.");
       }
     } else if (q.bentuk_soal === "PGK_KATEGORI") {
       if (!Array.isArray(q.pernyataan) || q.pernyataan.length === 0) {
@@ -1424,12 +1559,20 @@ ${formatCompetencyPlanPrompt(competencySlotPlans.slice(chunk1Count))}`;
         realStimulusId: finalStimulusId,
       });
     }
+    } catch (itemErr: any) {
+      console.error(`[generateBatchQuestions] Butir #${itemNum} tidak dapat diperiksa:`, itemErr);
+      failedItems.push({
+        index: itemNum,
+        reason: `Butir tidak dapat diperiksa karena format keluaran AI tak terduga: ${itemErr?.message || itemErr}`,
+        itemTitle: `Butir #${itemNum}`,
+      });
+    }
   });
 
   // 5B. Pemeriksaan Sebaran Tema Konteks (Revisi Terbatas Variasi Konteks)
   const temaFrequency: Record<string, number> = {};
   questionObjects.forEach((q) => {
-    const rawTheme = (q.tema_konteks || "").trim();
+    const rawTheme = typeof q.tema_konteks === "string" ? q.tema_konteks.trim() : "";
     if (rawTheme) {
       temaFrequency[rawTheme] = (temaFrequency[rawTheme] || 0) + 1;
     }
@@ -1512,7 +1655,20 @@ ${curriculumGuidance}`;
     for (const stim of retryStimuli) {
       const tempId = `retry-${retryAttempts}-${stim.stimulus_id_sementara}`;
       stim.stimulus_id_sementara = tempId;
-      let content = stim.konten || "";
+      const coercedRetry = coerceStimulusContent(stim.konten);
+      if (coercedRetry === null) {
+        rejectedStimuli[tempId] = {
+          reasons: ["Format konten stimulus bukan teks dan tidak dapat dikonversi."],
+          metricsSummary: "Konten stimulus tidak valid",
+        };
+        failedItems.push({
+          index: 0,
+          reason: `[GAGAL FORMAT STIMULUS - REGENERASI] Stimulus "${tempId}": konten bukan teks dan tidak dapat dikonversi.`,
+          itemTitle: `Stimulus Gagal (${tempId})`,
+        });
+        continue;
+      }
+      let content = coercedRetry;
 
       let valResult = validateLanguageTextComplexity({
         rawJenjang: jenjang,
@@ -1612,6 +1768,7 @@ ${curriculumGuidance}`;
     for (const q of retryQuestions) {
       if (validQuestions.length >= totalDiminta) break;
 
+      try {
       if (q.stimulus_id_sementara) {
         q.stimulus_id_sementara = `retry-${retryAttempts}-${q.stimulus_id_sementara}`;
       }
@@ -1623,6 +1780,9 @@ ${curriculumGuidance}`;
       }
 
       const qReasons: string[] = [];
+      if (mapel.toLowerCase().includes("matematika")) {
+        qReasons.push(...applyMathTaxonomyGuards(q, jenjang));
+      }
       for (const f of requiredFields) {
         if (!q[f] || (typeof q[f] === "string" && !q[f].trim())) {
           qReasons.push(`Field wajib "${f}" kosong.`);
@@ -1661,6 +1821,10 @@ ${curriculumGuidance}`;
           realStimulusId: q.jenis_soal === "grup" ? stimulusIdMap[q.stimulus_id_sementara] : null,
         });
       }
+      } catch (retryItemErr: any) {
+        // Isolasi per butir pada ronde regenerasi: butir bermasalah dilewati, ronde tetap lanjut.
+        console.error("[generateBatchQuestions] Butir regenerasi tidak dapat diperiksa:", retryItemErr);
+      }
     }
   }
 
@@ -1670,6 +1834,8 @@ ${curriculumGuidance}`;
   if (isLanguageSubject(mapel)) {
     validQuestions.forEach((vq, vIdx) => {
       const qNum = vIdx + 1;
+      // Pemeriksaan ini hanya peringatan; kesalahan format pada satu butir tidak boleh menggagalkan paket.
+      if (typeof vq.kompetensi !== "string" && vq.kompetensi != null) return;
       const normKomp = (vq.kompetensi || "").toLowerCase();
       const isInferensialOrEvaluasi =
         normKomp.includes("inferensial") || normKomp.includes("evaluasi");
@@ -1709,6 +1875,61 @@ ${curriculumGuidance}`;
         }
       }
     });
+  }
+
+  // 5B3. Observasi sebaran posisi kunci PG (hanya pencatatan; tidak menolak soal).
+  {
+    const keyCount: Record<string, number> = { A: 0, B: 0, C: 0, D: 0 };
+    let pgTotal = 0;
+    for (const vq of validQuestions) {
+      if (vq.bentuk_soal === "PG" && Array.isArray(vq.kunci_jawaban) && typeof vq.kunci_jawaban[0] === "string") {
+        keyCount[vq.kunci_jawaban[0]] = (keyCount[vq.kunci_jawaban[0]] || 0) + 1;
+        pgTotal++;
+      }
+    }
+    if (pgTotal >= 8) {
+      const summary = Object.entries(keyCount).map(([k, v]) => `${k}=${v}`).join(", ");
+      const maxShare = Math.max(...Object.values(keyCount)) / pgTotal;
+      const skewed = maxShare > 0.4 || Object.values(keyCount).some((v) => v === 0);
+      textComplexityLogs.push({
+        index: 0,
+        reason: `[Observasi Posisi Kunci PG] ${summary} dari ${pgTotal} butir PG. ${skewed ? "TIDAK SEIMBANG (satu huruf >40% atau ada huruf yang tidak pernah jadi kunci)." : "Seimbang."}`,
+        itemTitle: "Sebaran Kunci Jawaban PG",
+      });
+    }
+
+    // 5B4. Evaluasi Distribusi Kunci Jawaban PGK_MCMA (Variasi kuota kunci antar butir dalam paket)
+    const mcmaQuestions = validQuestions.filter((q) => q.bentuk_soal === "PGK_MCMA");
+    if (mcmaQuestions.length >= 3) {
+      const keyLenCounts: Record<number, number> = {};
+      let allCorrectCount = 0;
+      for (const mq of mcmaQuestions) {
+        const kLen = Array.isArray(mq.kunci_jawaban) ? mq.kunci_jawaban.length : 0;
+        const oLen = Array.isArray(mq.opsi) ? mq.opsi.length : 4;
+        keyLenCounts[kLen] = (keyLenCounts[kLen] || 0) + 1;
+        if (kLen === oLen && oLen > 0) {
+          allCorrectCount++;
+        }
+      }
+      const distSummary = Object.entries(keyLenCounts)
+        .map(([k, count]) => `${k} kunci benar: ${count} butir`)
+        .join(", ");
+      
+      const isUniform = Object.values(keyLenCounts).some((count) => count === mcmaQuestions.length);
+      const tooManyAllCorrect = allCorrectCount > Math.max(1, Math.floor(mcmaQuestions.length * 0.25));
+
+      textComplexityLogs.push({
+        index: 0,
+        reason: `[Distribusi Kunci PGK_MCMA] ${distSummary} dari total ${mcmaQuestions.length} butir MCMA. ${
+          isUniform
+            ? "PERINGATAN: Kunci MCMA seragam (seluruh butir memiliki jumlah kunci benar yang sama)."
+            : tooManyAllCorrect
+            ? `PERINGATAN: Terlalu banyak butir MCMA dengan semua opsi benar (${allCorrectCount} dari ${mcmaQuestions.length}). Disarankan maksimal 1 butir per paket.`
+            : "Variasi kunci seimbang dan terdistribusi baik."
+        }`,
+        itemTitle: "Sebaran Kunci Jawaban PGK_MCMA",
+      });
+    }
   }
 
   if (wacanaRepaired > 0 || wacanaRepairFailed > 0) {

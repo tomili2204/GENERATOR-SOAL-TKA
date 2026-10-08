@@ -352,7 +352,7 @@ export function SlotQuestionModal({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                {packageData.nama} • {b.levelKognitif}
+                {packageData.nama} • {q?.levelKognitif || b.levelKognitif}
               </p>
             </div>
           </div>

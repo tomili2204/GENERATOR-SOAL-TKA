@@ -13,15 +13,24 @@ const ROLE = `Anda adalah pengembang soal Tes Kemampuan Akademik (TKA) profesion
 
 const BENTUK_SOAL = `BENTUK SOAL — hanya tiga ini:
 - PG: pilihan ganda, tepat satu jawaban benar dari 4 opsi.
-- PGK_MCMA: pilihan ganda kompleks, 1 sampai 3 opsi benar dari 4 opsi (tidak pernah semua opsi benar); variasikan banyaknya opsi benar antar-butir.
-  PENTING PGK_MCMA: Rencanakan dan hitung angka pengecoh (opsi salah) SEBELUM menulis array "opsi". Pastikan minimal 1 opsi salah secara matematis sebelum menulis teks opsi, agar teks opsi dan kunci jawaban sinkron sejak awal.
+- PGK_MCMA: pilihan ganda kompleks multi-jawaban (4 opsi). Variasikan banyaknya opsi benar secara seimbang dan proporsional antar-butir dalam satu paket:
+  * Variasi 1 opsi benar (3 opsi salah) — untuk menguji ketelitian dan mengecoh miskonsepsi umum.
+  * Variasi 2 opsi benar (2 opsi salah) — sangat diutamakan untuk daya pembeda asesmen penalaran.
+  * Variasi 3 opsi benar (1 opsi salah).
+  * Variasi semua opsi benar (4 opsi benar) diperbolehkan sesekali (maksimal 1 butir per paket) bila seluruh 4 pernyataan memang terbukti valid secara matematis/faktual.
+  * DILARANG KERAS membuat pola seragam di mana seluruh butir PGK_MCMA memiliki jumlah opsi benar yang sama persis (misal semuanya benar semua atau semuanya 3 benar).
+  PENTING PGK_MCMA: Rencanakan kebenaran dan kekeliruan tiap opsi secara cermat sebelum menulis array "opsi". Sesuaikan "kunci_jawaban" persis dengan opsi yang secara matematis/faktual benar, dan pastikan penjelasan pada "pembahasan" membuktikan kebenaran maupun kekeliruan tiap opsi.
 - PGK_KATEGORI: beberapa pernyataan yang masing-masing direspons dengan satu kategori. Pilih pasangan kategori yang cocok dengan pertanyaannya, misalnya Benar/Salah, Sesuai/Tidak Sesuai, Setuju/Tidak Setuju, Fakta/Opini, Mendukung/Tidak Mendukung.
 Distribusikan ketiga bentuk dalam satu batch. Opsi dan pernyataan yang salah harus berupa pengecoh masuk akal yang mencerminkan kekeliruan nyata siswa.`;
 
 const GAYA_SOAL = `GAYA SOAL TKA RESMI — pedoman utama:
-1. Situasi dekat dengan keseharian siswa: kegiatan di sekolah (perpustakaan, kantin, lomba, ekstrakurikuler, bakti sosial), di rumah dan keluarga (belanja, memasak, menabung, liburan, merawat tanaman atau hewan), dan di lingkungan sekitar (pasar, warung, toko, sawah, kebun, kolam ikan, puskesmas, taman kota, kebun binatang, perjalanan). Situasi yang lebih jarang boleh dipakai sesekali, asalkan mudah dibayangkan tanpa pengetahuan khusus.
+1. Konteks WAJIB membumi, inklusif, dan dikenal oleh SELURUH siswa di Indonesia (Sabang sampai Merauke, baik di perkotaan, pedesaan, maupun wilayah 3T). DILARANG KERAS menggunakan latar atau istilah metropolitan elitis yang asing bagi siswa daerah lain (seperti KRL, LRT, MRT, Busway, e-commerce, atau teknologi antariksa/astronomi).
+   Pilihlah situasi nyata yang akrab:
+   - Di rumah & dapur: takaran bahan resep kue/masakan (rasio, pecahan), penggunaan air tandon/sumur pompa saat kemarau (debit air, waktu pengisian), pembagian hasil panen buah/sayur ke keranjang (FPB).
+   - Di sekolah & komunitas: regu piket kelas membersihkan papan tulis (KPK/jadwal berkala), jadwal ronda poskamling warga, jadwal angkutan umum/bus antarkota/perahu antar dermaga, gotong royong kerja bakti warga desa/sekolah (perbandingan berbalik nilai pekerja vs waktu).
+   - Prakarya & lingkungan: kerangka layang-layang tradisional, anyaman bambu, ubin lantai teras (geometri, simetri, luas, pola barisan), pengukuran batas lapangan olahraga sekolah.
 2. Satu soal cukup satu situasi yang wajar. Kesulitan soal berasal dari penalaran yang dituntut, bukan dari latar yang rumit, pekerjaan yang tidak biasa, atau istilah teknis.
-3. Tokoh memakai nama sehari-hari yang beragam. Tokoh boleh siswa, anggota keluarga, guru, atau warga biasa; bila diberi pekerjaan, pilih pekerjaan yang dikenal siswa. Dalam satu paket, jangan mengulang nama, pekerjaan, atau latar yang sama.
+3. Tokoh memakai nama-nama yang mencerminkan keragaman Indonesia secara wajar dan akrab (misal: Bagas, Dimas, Sekar, Wayan, Made, Asep, Alif, Nisa, Ucok, Butet, Yohanes, Martha, Rian), atau sebutan peran sosial yang universal ("seorang pengrajin", "petugas posyandu", "petani jeruk", "panitia bazar sekolah", "anggota pramuka"). DILARANG KERAS hanya mengulang nama klise buku teks lama (Budi, Siti, Beni). Dalam satu paket, jangan mengulang nama, peran, atau latar yang sama.
 4. Angka realistis dan ramah hitung sesuai jenjang.
 5. Banyak langkah berpikir mengikuti tingkat kesulitan: rendah 1–2 langkah, sedang 2–3 langkah, tinggi 3 langkah atau lebih atau penalaran tidak rutin.
 6. Istilah yang belum umum bagi siswa jenjang ini dijelaskan singkat saat pertama muncul. Singkatan lembaga ditulis kepanjangannya. Makhluk hidup disebut dengan nama umum bahasa Indonesia, bukan nama ilmiah.
@@ -140,8 +149,12 @@ const RUMUS_DAN_PEMBAHASAN = `PENULISAN RUMUS DAN PEMBAHASAN:
 - DILARANG KERAS menyertakan proses berpikir/monolog internal AI atau evaluasi instruksi prompt (seperti "karena aturan PGK tidak boleh semua benar", "mari kita ubah opsi", "mari beri opsi benar", "mari gunakan angka lain", "agar opsi D bernilai salah", "agar pas bulat", "mungkin salah ketik", "sebagai AI", dsb) ke dalam "pembahasan". Pembahasan HANYA berisi penjelasan konsep, penjabaran langkah hitungan untuk siswa, dan simpulan jawaban.
 - DILARANG KERAS memunculkan huruf opsi bayangan di dalam "pembahasan" yang tidak terdapat pada daftar opsi (misalnya menyebut Opsi E atau Pernyataan E padahal opsi hanya sampai D).`;
 
-function formatKeluaranBlock(mapel: string): string {
+function formatKeluaranBlock(mapel: string, jenjang = ""): string {
   const isBahasa = mapel.toLowerCase().includes("indonesia") || mapel.toLowerCase().includes("inggris");
+  // Kerangka asesmen resmi SD/MI hanya Bilangan, Geometri dan Pengukuran, dan Data (tanpa Aljabar).
+  const elemenMatematika = jenjang.includes("SD")
+    ? `("Bilangan", "Geometri dan Pengukuran", atau "Data"; Aljabar BUKAN elemen SD/MI sehingga dilarang dipakai)`
+    : `("Bilangan", "Aljabar", "Geometri dan Pengukuran", atau "Data dan Peluang")`;
   const taxonomyGuide = isBahasa
     ? `ATURAN TAKSONOMI RESMI BAHASA INDONESIA (3 Tingkat Sesuai Standar Pusmendik):
 - "elemen": isi dengan Kompetensi Membaca utama ("Pemahaman Tekstual", "Pemahaman Inferensial", atau "Evaluasi dan Apresiasi").
@@ -149,8 +162,9 @@ function formatKeluaranBlock(mapel: string): string {
 - "kompetensi": isi sama dengan Kompetensi Membaca utama ("Pemahaman Tekstual", "Pemahaman Inferensial", atau "Evaluasi dan Apresiasi").
 - "indikator": isi dengan rumusan Indikator Soal resmi (misal: "Menentukan informasi tersurat pada teks. (1)" atau "Menyimpulkan tujuan penulis dalam teks. (7)").`
     : `ATURAN TAKSONOMI RESMI MATEMATIKA (4 Tingkat Sesuai Standar Pusmendik):
-- "elemen": isi dengan Elemen Matematika ("Bilangan", "Aljabar", "Geometri dan Pengukuran", atau "Data dan Ketidakpastian").
+- "elemen": isi dengan Elemen Matematika ${elemenMatematika}. Patuhi elemen yang ditetapkan pada rencana butir bila ada.
 - "sub_elemen": isi dengan Subelemen materi ("Bilangan Real", "Bilangan Rasional", "Persamaan dan Pertidaksamaan", "Geometri Datar", "Penyajian Data", dsb).
+- "level_kognitif": WAJIB tepat salah satu dari "Pengetahuan dan Pemahaman", "Aplikasi", atau "Penalaran". Dilarang memakai kata lain (misalnya "Rendah", "Sedang", "Tinggi", "L1", "L2", "L3"); tingkat mudah-sulit ditulis di field "tingkat_kesulitan", bukan di sini.
 - "kompetensi": isi dengan rumusan Kompetensi Capaian (misal: "Kemampuan memahami, mengaplikasikan, dan bernalar yang lebih tinggi untuk menyelesaikan permasalahan terkait perbandingan dan sifat-sifat bilangan").
 - "indikator": isi dengan rumusan Indikator Soal spesifik (misal: "Menyelesaikan operasi bilangan bentuk pangkat (1)").`;
 
@@ -192,7 +206,7 @@ export function buildSystemPrompt(jenjang: string, mapel: string): string {
     isBahasa ? bahasaRules(jenjang) : "",
     VISUAL_RULES,
     RUMUS_DAN_PEMBAHASAN,
-    formatKeluaranBlock(mapel),
+    formatKeluaranBlock(mapel, jenjang),
   ]
     .filter(Boolean)
     .join("\n\n");

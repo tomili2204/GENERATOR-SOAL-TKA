@@ -3,11 +3,31 @@ import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
 
+if (!process.env.VPS_PASSWORD && fs.existsSync(".env.local")) {
+  const envContent = fs.readFileSync(".env.local", "utf8");
+  for (const line of envContent.split("\n")) {
+    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+    if (match) {
+      const key = match[1];
+      let value = match[2] || "";
+      value = value.trim().replace(/^["']|["']$/g, "");
+      if (!process.env[key]) process.env[key] = value;
+    }
+  }
+}
+
+if (!process.env.VPS_PASSWORD) {
+  console.error(
+    "❌ VPS_PASSWORD tidak ditemukan. Set dulu di .env.local atau sebagai environment variable sebelum menjalankan deploy:vps."
+  );
+  process.exit(1);
+}
+
 const config = {
-  host: "187.77.115.29",
-  port: 22,
-  username: "root",
-  password: "Den985985985##",
+  host: process.env.VPS_HOST || "187.77.115.29",
+  port: Number(process.env.VPS_PORT) || 22,
+  username: process.env.VPS_USERNAME || "root",
+  password: process.env.VPS_PASSWORD,
 };
 
 function runSSHCommand(conn: Client, cmd: string): Promise<number> {
@@ -50,7 +70,7 @@ async function deploy() {
   if (fs.existsSync(archivePath)) fs.unlinkSync(archivePath);
 
   // Tar source code, excluding build outputs and heavy dependencies
-  const tarCmd = `tar --exclude="node_modules" --exclude=".next" --exclude=".git" --exclude="scratch" --exclude=".vercel" --exclude="scripts/*.tar.gz" -czf "${archivePath}" -C "${projectDir}" .`;
+  const tarCmd = `tar --exclude="node_modules" --exclude=".next" --exclude=".git" --exclude="scratch" --exclude="backup-wp" --exclude=".vercel" --exclude="scripts/*.tar.gz" --exclude=".data" --exclude=".data_backup" --exclude=".env*" --exclude=".claude" -czf "${archivePath}" -C "${projectDir}" .`;
   execSync(tarCmd, { stdio: "inherit" });
   const archiveSize = (fs.statSync(archivePath).size / (1024 * 1024)).toFixed(2);
   console.log(`Arsip siap: ${archiveSize} MB`);

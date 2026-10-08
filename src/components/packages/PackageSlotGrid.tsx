@@ -144,8 +144,11 @@ export function PackageSlotGrid({ slots, onSelectSlot, isValidator = false }: Pa
                     {slot.question?.tingkatKesulitan || b.tingkatKesulitan}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-600 line-clamp-1" title={b.levelKognitif}>
-                  {b.levelKognitif}
+                <p
+                  className="text-[11px] text-slate-600 line-clamp-1"
+                  title={slot.question?.levelKognitif || b.levelKognitif}
+                >
+                  {slot.question?.levelKognitif || b.levelKognitif}
                 </p>
               </div>
 
@@ -200,8 +203,8 @@ export function PackageSlotGrid({ slots, onSelectSlot, isValidator = false }: Pa
                 </span>
               )}
 
-              <span className="text-[10px] font-mono text-slate-400">
-                {b.rekomendasiJenisSoal === "grup" ? "Grup" : "Tunggal"}
+              <span className="text-[10px] font-mono text-slate-400 capitalize">
+                {(slot.question?.jenisSoal || b.rekomendasiJenisSoal) === "grup" ? "Grup" : "Tunggal"}
               </span>
             </div>
           </div>

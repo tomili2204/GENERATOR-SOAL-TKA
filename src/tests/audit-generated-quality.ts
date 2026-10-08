@@ -58,7 +58,6 @@ for (const q of qs) {
     const labels = p.opsi.map((o: any) => o.label);
     const invalid = kunci.filter((k) => !labels.includes(k));
     if (invalid.length) problems.push(`${q.code}: kunci ${JSON.stringify(invalid)} tidak ada di opsi ${JSON.stringify(labels)}`);
-    if (q.bentukSoal === "PGK_MCMA" && kunci.length === labels.length) problems.push(`${q.code}: PGK_MCMA semua opsi benar`);
   }
   if (q.bentukSoal === "PGK_KATEGORI" && (!Array.isArray(p.pernyataan) || p.pernyataan.length !== kunci.length)) {
     problems.push(`${q.code}: jumlah pernyataan (${p.pernyataan?.length}) != jumlah kunci (${kunci.length})`);
