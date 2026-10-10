@@ -26,10 +26,8 @@ export interface TutorChatMessage {
 
 const FALLBACK_MODELS = [
   "gemini-flash-lite-latest",
-  "gemini-3.5-flash-lite",
   "gemini-3.1-flash-lite",
   "gemini-flash-latest",
-  "gemini-3.8-flash",
 ];
 
 export function getTutorConfig() {
@@ -139,7 +137,86 @@ export async function getTutorChatResponse(params: {
   const config = getTutorConfig();
   const systemInstruction = buildTutorSystemInstruction(params.context);
 
-  // TAHAP 1: Coba lewat 9Router Combo jika diaktifkan
+  // TAHAP 1 (PRIORITAS UTAMA): Panggil langsung Google Gemini API (Super Cepat 1-2 Detik)
+  if (config.apiKey) {
+    const modelsToTry = [
+      config.modelName,
+      ...FALLBACK_MODELS.filter((m) => m !== config.modelName),
+    ];
+
+    const contents = params.messages.map((m) => {
+      let textContent = m.content || "";
+      if (m.documents && m.documents.length > 0) {
+        for (const doc of m.documents) {
+          textContent += `\n\n[DOKUMEN TERLAMPIR: ${doc.name}]\n${doc.content}\n[AKHIR DOKUMEN]`;
+        }
+      }
+
+      const parts: any[] = [{ text: textContent || "Periksa lampiran berikut." }];
+
+      if (m.images && m.images.length > 0) {
+        for (const img of m.images) {
+          const match = img.match(/^data:([^;]+);base64,(.+)$/);
+          if (match) {
+            parts.push({
+              inlineData: {
+                mimeType: match[1],
+                data: match[2],
+              },
+            });
+          }
+        }
+      }
+
+      return {
+        role: m.role === "assistant" ? "model" : "user",
+        parts,
+      };
+    });
+
+    const payload: any = {
+      systemInstruction: {
+        parts: [{ text: systemInstruction }],
+      },
+      contents,
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 2048,
+      },
+    };
+
+    for (const currentModel of modelsToTry) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${config.apiKey}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text && text.trim().length > 0) {
+            return { reply: text.trim(), modelUsed: "AyoTKA Tutor AI" };
+          }
+        } else {
+          const errorJson = await res.json().catch(() => ({}));
+          const msg = errorJson?.error?.message || `Status ${res.status}`;
+          console.warn(`[Tutor AI Direct] Model ${currentModel} status ${res.status}: ${msg}.`);
+        }
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        console.warn(`[Tutor AI Direct] Kesalahan model ${currentModel}:`, err.message);
+      }
+    }
+  }
+
+  // TAHAP 2 (CADANGAN): Fallback ke 9Router Multi-Provider Combo jika Gemini Direct kendala
   if (config.router9Enabled && config.router9Url) {
     try {
       const openAiMessages = [
@@ -173,7 +250,7 @@ export async function getTutorChatResponse(params: {
       ];
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout untuk fallback
 
       const res = await fetch(`${config.router9Url}/chat/completions`, {
         method: "POST",
@@ -198,93 +275,11 @@ export async function getTutorChatResponse(params: {
         if (content && content.trim().length > 0) {
           return { reply: content.trim(), modelUsed: "AyoTKA Tutor AI" };
         }
-      } else {
-        const errText = await res.text().catch(() => "");
-        console.warn(`[Tutor AI] 9Router mengembalikan status ${res.status}: ${errText}. Beralih ke fallback Gemini direct...`);
       }
     } catch (err: any) {
-      console.warn(`[Tutor AI] 9Router tidak dapat dihubungi (${err.message}). Beralih ke direct Gemini fallback...`);
+      console.warn(`[Tutor AI] Fallback 9Router tidak dapat dihubungi (${err.message})`);
     }
   }
 
-  // TAHAP 2: Fallback langsung ke Google Gemini API
-  const modelsToTry = [
-    config.modelName,
-    ...FALLBACK_MODELS.filter((m) => m !== config.modelName),
-  ];
-
-  const contents = params.messages.map((m) => {
-    let textContent = m.content || "";
-    if (m.documents && m.documents.length > 0) {
-      for (const doc of m.documents) {
-        textContent += `\n\n[DOKUMEN TERLAMPIR: ${doc.name}]\n${doc.content}\n[AKHIR DOKUMEN]`;
-      }
-    }
-
-    const parts: any[] = [{ text: textContent || "Periksa lampiran berikut." }];
-
-    if (m.images && m.images.length > 0) {
-      for (const img of m.images) {
-        const match = img.match(/^data:([^;]+);base64,(.+)$/);
-        if (match) {
-          parts.push({
-            inlineData: {
-              mimeType: match[1],
-              data: match[2],
-            },
-          });
-        }
-      }
-    }
-
-    return {
-      role: m.role === "assistant" ? "model" : "user",
-      parts,
-    };
-  });
-
-  const payload: any = {
-    systemInstruction: {
-      parts: [{ text: systemInstruction }],
-    },
-    contents,
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 2048,
-    },
-  };
-
-  let lastError: any = null;
-
-  for (const currentModel of modelsToTry) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${config.apiKey}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errorJson = await res.json().catch(() => ({}));
-        const msg = errorJson?.error?.message || `Status ${res.status}`;
-        console.warn(`[Tutor AI Direct] Model ${currentModel} mengembalikan status ${res.status}: ${msg}. Mencoba model alternatif...`);
-        lastError = new Error(msg);
-        continue;
-      }
-
-      const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text && text.trim().length > 0) {
-        return { reply: text.trim(), modelUsed: "AyoTKA Tutor AI" };
-      }
-    } catch (err: any) {
-      console.warn(`[Tutor AI Direct] Kesalahan koneksi pada model ${currentModel}:`, err.message);
-      lastError = err;
-    }
-  }
-
-  throw new Error(
-    lastError?.message || "Seluruh model Tutor AI saat ini sedang sibuk. Silakan coba lagi beberapa saat lagi."
-  );
+  throw new Error("Seluruh model Tutor AI saat ini sedang sibuk. Silakan coba lagi beberapa saat lagi.");
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   Sparkles,
   Lock,
@@ -14,12 +14,15 @@ import {
   MessageSquare,
   UserCheck,
 } from "lucide-react";
+import { LoginSiswaModal } from "./LoginSiswaModal";
 
 interface AiLandingPageProps {
   onLoginSuccess?: (user: any) => void;
 }
 
 export function AiLandingPage({ onLoginSuccess }: AiLandingPageProps) {
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col selection:bg-blue-500 selection:text-white">
       {/* Top Navigation */}
@@ -49,13 +52,14 @@ export function AiLandingPage({ onLoginSuccess }: AiLandingPageProps) {
             >
               Daftar Member
             </a>
-            <a
-              href="https://ayotka.id/login"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-sm shadow-blue-500/20 transition active:scale-95"
+            <button
+              type="button"
+              onClick={() => setIsLoginModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-sm shadow-blue-500/20 transition active:scale-95 cursor-pointer"
             >
               <Lock className="w-3.5 h-3.5" />
               Masuk sebagai Member
-            </a>
+            </button>
           </div>
         </div>
       </header>
@@ -86,13 +90,14 @@ export function AiLandingPage({ onLoginSuccess }: AiLandingPageProps) {
 
             {/* CTA Group */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-md mx-auto mb-12">
-              <a
-                href="https://ayotka.id/login"
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm shadow-md shadow-blue-500/25 transition active:scale-95"
+              <button
+                type="button"
+                onClick={() => setIsLoginModalOpen(true)}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm shadow-md shadow-blue-500/25 transition active:scale-95 cursor-pointer"
               >
                 <UserCheck className="w-4 h-4" />
                 Masuk sebagai Member
-              </a>
+              </button>
               <a
                 href="https://ayotka.id/registrasi"
                 className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-sm border border-slate-300 shadow-xs transition"
@@ -196,12 +201,13 @@ export function AiLandingPage({ onLoginSuccess }: AiLandingPageProps) {
                   placeholder="Ketik balasan atau upload foto soal..."
                   className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-400 cursor-not-allowed"
                 />
-                <a
-                  href="https://ayotka.id/login"
-                  className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition"
+                <button
+                  type="button"
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition cursor-pointer"
                 >
                   Masuk sebagai Member
-                </a>
+                </button>
               </div>
             </div>
           </div>
@@ -311,13 +317,14 @@ export function AiLandingPage({ onLoginSuccess }: AiLandingPageProps) {
               Cukup masuk dengan akun member AyoTKA Anda untuk langsung mengakses ruang bimbingan belajarmu.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5">
-              <a
-                href="https://ayotka.id/login"
-                className="px-8 py-3.5 rounded-xl bg-white text-blue-700 font-bold text-sm shadow-lg shadow-black/10 hover:bg-blue-50 transition active:scale-95 inline-flex items-center gap-2"
+              <button
+                type="button"
+                onClick={() => setIsLoginModalOpen(true)}
+                className="px-8 py-3.5 rounded-xl bg-white text-blue-700 font-bold text-sm shadow-lg shadow-black/10 hover:bg-blue-50 transition active:scale-95 inline-flex items-center gap-2 cursor-pointer"
               >
                 <Lock className="w-4 h-4" />
                 Masuk sebagai Member
-              </a>
+              </button>
               <a
                 href="https://ayotka.id/registrasi"
                 className="px-8 py-3.5 rounded-xl bg-blue-500/30 text-white font-bold text-sm border border-white/30 hover:bg-white/10 transition active:scale-95 inline-flex items-center gap-2"
@@ -341,12 +348,23 @@ export function AiLandingPage({ onLoginSuccess }: AiLandingPageProps) {
             <a href="https://ayotka.id/registrasi" className="hover:text-blue-600 transition">
               Daftar Member
             </a>
-            <a href="https://ayotka.id/login" className="hover:text-blue-600 transition font-semibold text-blue-600">
+            <button
+              type="button"
+              onClick={() => setIsLoginModalOpen(true)}
+              className="hover:text-blue-600 transition font-semibold text-blue-600 cursor-pointer"
+            >
               Masuk sebagai Member
-            </a>
+            </button>
           </div>
         </div>
       </footer>
+
+      {/* Modal Login Siswa Langsung */}
+      <LoginSiswaModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onLoginSuccess={onLoginSuccess}
+      />
     </div>
   );
 }

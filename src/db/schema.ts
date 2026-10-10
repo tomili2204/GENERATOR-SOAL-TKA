@@ -2,7 +2,7 @@ import { pgSchema, text, timestamp, boolean, integer, jsonb } from "drizzle-orm/
 
 export const soalSchema = pgSchema("soal");
 
-export type UserRoleType = "admin" | "pembuat_soal" | "validator_soal";
+export type UserRoleType = "admin" | "pembuat_soal" | "validator_soal" | "siswa" | string;
 export type QuestionStatusType = "draft" | "menunggu_validasi" | "direvisi" | "perlu_revisi" | "disetujui" | "ditolak";
 export type JenjangType = "SD/MI" | "SMP/MTs" | "SMA/MA" | "SMK/MAK" | "SD" | "SMP";
 export type MapelType = "Bahasa Indonesia" | "Matematika" | string;
